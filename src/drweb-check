@@ -1,0 +1,25 @@
+#!/bin/sh
+
+drweb(){
+  : '
+    Функция проверяет список запущенных компонентов САВЗ Dr.Web и выполняет попытку создания тестового вируса eicar.
+    Если компоненты ConfigD, ScanEngine, FileCheck и LinuxSpider запущены,
+    тестовый вирус eicar обнаружен и помещен в карантин, проверка считается успешной
+  '
+  echo -n "Проверка работоспособности САВЗ Dr.Web..."
+  if [ $(drweb-ctl appinfo | awk '{print $1 $3}' | grep -c -E "ConfigD;RUNNING|ScanEngine;RUNNING|FileCheck;RUNNING|LinuxSpider;RUNNING") -ne 4 ]; then
+    echo -e "${Red}ошибка!${NC}"; echo "Запущены не все компоненты САВЗ Dr.Web"
+    return 1
+  fi
+  drweb-ctl quarantine --Delete All 1> /dev/null
+  grep X5O /opt/drweb.com/share/doc/drweb-se/readme.eicar > /tmp/eicar
+
+  # На всякий случай ждем 5 сек для обнаружения тестового вируса и помещения его в карантин
+  sleep 5
+  if [ -z "$(drweb-ctl quarantine)" ]; then
+    echo -e "${Red}ошибка!${NC}"; echo "Тестовый вирус eicar не обнаружен"
+    return 1
+  fi
+}
+
+drweb
