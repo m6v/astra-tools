@@ -1,0 +1,4 @@
+#!/bin/sh
+diff /root/$(hostname).afick /etc/afick.conf
+
+
