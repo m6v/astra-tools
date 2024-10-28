@@ -6,7 +6,7 @@ afick --print_rule
 
 NB! Заменить на сравнение эталонного файла с настройками на текущий файл настроек
 
-diff /root/afick.cgf /etc
+diff /root/afick.cgf /etc/afick.conf
 
 2) проверить, что сервис запуска службы регламентного контроля целостности СВТ включен, выполнив в терминале Fly команду
 systemctl is-enabled afick
