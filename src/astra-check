@@ -1,10 +1,10 @@
 #!/bin/sh
+
 VERSION=1.06
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 all_checks="audit_parms swapwiper_control secdel_control mac_control \
             nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
-            passwords_policy blocking_policy \
-            logrotate_parms parsec_tests afick_parms created_groups created_users"
+            passwords_policy blocking_policy logrotate_parms parsec_tests"
 show_help=false
 NC='\033[0m' # No Color
 Red='\033[0;31m' # Red
@@ -356,25 +356,6 @@ parsec_tests(){
   fi
 }
 
-afick_parms(){
-  : '
-    Функция проверяет состояние службы afick и код возврата последнего запуска.
-    Если служба включена (enabled) и код возврата нулевой, проверка считается успешной
-  '
-  echo -n "Проверка настроек средства регламентного контроля целостности Afick..."
-  result=$(systemctl is-enabled afick 2> /dev/null)
-  if [ "$result" != "enabled" ]; then
-    echo -e "${Red}ошибка!${NC}"; echo "Служба запуска средства регламентного контроля целостности Afick не включена"
-    return 1
-  fi
-
-  if [ -z "$(systemctl status afick | grep status=0/SUCCESS)" ]; then
-    echo "Последний запуск средства регламентного контроля целостности Afick завершен с ошибкой!"
-    echo "Выполните команду systemctl status afick и проанализируйте логи"
-    return 1
-  fi
-}
-
 created_groups(){
   echo -n "Проверка групп пользователей, созданных после установки системы..."
   getent group | awk -F: '{ if ($3 >= 1000 && $3 < 60000) printf " %s", $1}'; echo
@@ -426,8 +407,8 @@ if [ -z "$selected_checks" ]; then
 fi
 
 if $show_help; then
-  echo "Использование: autocheck [-l|-h|-v] [ПРОВЕРКА]..."
-  echo "Программа автоматизированной проверки настроек комплекса средств защиты информации"
+  echo "Использование: astra-check [-l|-h|-v] [ПРОВЕРКА]..."
+  echo "Проверяет настройки комплекса средств защиты информации ОС Astra Linux SE"
   echo
   echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
   echo "  -l, --list    показать список проверок и выйти"
