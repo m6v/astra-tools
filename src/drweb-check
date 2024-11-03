@@ -47,7 +47,7 @@ while [[ "$#" -gt 0 ]]; do
       show_help=true
       ;;
     -v|--version)
-      echo drweb-check $VERSION
+      echo echo $(basename $0) $VERSION
       exit
       ;;
     *)
