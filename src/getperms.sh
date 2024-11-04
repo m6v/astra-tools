@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 
-VERSION=1.01
+VERSION=1.02
 
 dir="/"
+
+usage() {
+  echo "Использование: $(basename $0) [-h|-v] [КАТАЛОГ]..."
+  echo "Выводит права доступа к файлам и каталогам, находящимся в указанном каталоге,"
+  echo "если каталог не задан, то начиная с корневого каталога"
+  echo
+  echo "  -h, --help    показать эту справку и выйти"
+  echo "  -v. --version показать информацию о версии и выйти"
+}
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -25,14 +34,17 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ -n "$show_help" ]; then
-  echo "Использование: chkperms [-h|-v] [КАТАЛОГ]..."
-  echo "Выводит права доступа к файлам и каталогам, находящимся в указанном каталоге,"
-  echo "если каталог не задан, то начиная с корневого каталога"
-  echo
-  echo "  -h, --help    показать эту справку и выйти"
-  echo "  -v. --version показать информацию о версии и выйти"
+  usage
   exit
 fi
 
-# find $dir -type f -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-
-find $dir -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-
+# Присвоить переменной NAME имя дистрибутива
+eval $(grep ^NAME /etc/os-release)
+if [ "$NAME" == "Astra" ]; then
+  # Исправить, чтобы в Астре это работало правилиьно, кол-во полей точно отличается!
+  cmd="find $dir \! -type l -exec lpdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,3,4,7-"
+else
+  cmd="find $dir \! -type l -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-"
+fi
+
+eval $cmd
