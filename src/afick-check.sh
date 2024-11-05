@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 VERSION=1.06
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
