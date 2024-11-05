@@ -16,7 +16,8 @@ usage() {
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     -h|--help)
-      show_help=true
+      usage
+      exit
       ;;
     -v|--version)
       echo $(basename $0) $VERSION
@@ -32,11 +33,6 @@ while [[ "$#" -gt 0 ]]; do
   esac
   shift
 done
-
-if [ -n "$show_help" ]; then
-  usage
-  exit
-fi
 
 # Присвоить переменной NAME имя дистрибутива
 eval $(grep ^NAME /etc/os-release)
