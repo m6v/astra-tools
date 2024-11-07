@@ -68,8 +68,7 @@ total=$(cat $file | wc -l)
 tcols=$(tput cols)
 
 get_astra_perms(){
-  # Исправить, чтобы в Астре это работало правилиьно, кол-во полей точно отличается!
-  echo $(eval "pdp-ls -daM --time-style=+ $1 | cut -d' ' -f1,3,4,7-")
+  echo $(eval "pdp-ls -daM --time-style=+ $1 | cut -d' ' -f1,4-")
 }
 
 get_linux_perms(){
@@ -79,7 +78,7 @@ get_linux_perms(){
 # Присвоить переменной NAME имя дистрибутива
 eval $(grep ^NAME /etc/os-release)
 # Присвоить переменной get_os_perms указатель на нужную функцию в зависимости от ОС
-if [ "$NAME" == "Astra linux" ]; then
+if [ "$NAME" == "Astra Linux" ]; then
   # Исправить, чтобы в Астре это работало правилиьно, кол-во полей точно отличается!
   get_os_perms=(get_astra_perms)
 else

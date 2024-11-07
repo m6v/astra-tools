@@ -36,9 +36,8 @@ done
 
 # Присвоить переменной NAME имя дистрибутива
 eval $(grep ^NAME /etc/os-release)
-if [ "$NAME" == "Astra" ]; then
-  # Исправить, чтобы в Астре это работало правилиьно, кол-во полей точно отличается!
-  cmd="find $dir \! -type l -exec lpdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,3,4,7-"
+if [ "$NAME" == "Astra Linux" ]; then
+  cmd="find $dir \! -type l -exec pdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,4-"
 else
   cmd="find $dir \! -type l -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-"
 fi
