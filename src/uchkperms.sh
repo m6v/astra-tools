@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Скрипт для проверки соответствия прав матрице доступа
-# В зависимости от используемого дистрибутива необходимо
-# закомментировать (раскоммекнтировать) указанные строки
+# Универсальный скрипт для проверки соответствия прав матрице доступа
 
 VERSION=1.11
 
@@ -34,7 +32,7 @@ progress(){
   printf [%d%%]"#\e[%d;b\r" $percent $sharps
 }
 
-# Присвоить переменной указатель на пустую операцию
+# присваиваем переменной указатель на пустую операцию
 show_progress=(:)
 
 while [[ "$#" -gt 0 ]]; do
@@ -47,7 +45,7 @@ while [[ "$#" -gt 0 ]]; do
       verbose=true
       ;; 
     -p|--progress)
-      # Присвоить переменной указатель на функцию отображения индикатора прогресса
+      # присваиваем переменной указатель на функцию отображения индикатора прогресса
       show_progress=(progress)
       ;;     
     --version)
@@ -67,25 +65,40 @@ if [ ! -f "$file" ]; then
 fi
 
 total=$(cat $file | wc -l)
-# Поучить число колонок в окне терминала 
+# Число колонок в окне терминала 
 tcols=$(tput cols)
+
+get_astra_perms(){
+  echo $(eval "pdp-ls -daM --time-style=+ $1 | cut -d' ' -f1,4-")
+}
+
+get_linux_perms(){
+  echo $(eval "ls -dal --time-style=+ $1 | cut -d' ' -f1,3,4,7-")
+}
+
+# Присвоить переменной NAME имя дистрибутива
+eval $(grep ^NAME /etc/os-release)
+# Присвоить переменной get_os_perms указатель на нужную функцию в зависимости от ОС
+if [ "$NAME" == "Astra Linux" ]; then
+  get_os_perms=(get_astra_perms)
+  get_fname='echo $line | cut -d" " -f5-'
+else
+  get_os_perms=(get_linux_perms)
+  get_fname='echo $line | cut -d" " -f4-'
+fi
 
 echo "Проверка прав доступа..."
 while read -r line; do
   $show_progress $checks
   ((checks++))
-  # Раскомментировать следующую строку для GNU/Linux
-  fname=$(echo $line | cut -d' ' -f4-) 
-  # Раскомментировать следующую строку для Astra Linux
-  # fname=$(echo $line | cut -d' ' -f5-)
+
+  fname=$(eval "$get_fname")
   if [ ! -e "${fname}" ]; then
     echo -e "${fname}...${red}нет такого файла или каталога${none}"
     continue
   fi
-  # Раскомментировать следующую строку для GNU/Linux
-  perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
-  # Раскомментировать следующую строку для Astra Linux
-  # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
+  # Имя файла обрамляем одинарными кавычками на случай наличия в нем пробелов
+  perms=$($get_os_perms "'$fname'")
 
   if [ "$line" != "$perms" ]; then
     ((errors++))
