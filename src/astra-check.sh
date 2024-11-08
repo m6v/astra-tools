@@ -11,7 +11,17 @@ all_checks="audit_parms swapwiper_control secdel_control mac_control \
             nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
             passwords_policy blocking_policy logrotate_parms parsec_tests_installed"
 
-show_help=false
+usage(){
+  echo "Использование: $(basename $0) [-l|-h|-v|-c КЛАСС] [ПРОВЕРКА]..."
+  echo "Проверяет настройки комплекса средств защиты информации ОС Astra Linux SE"
+  echo
+  echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
+  echo "  -c, --class КЛАСС задать класс защищенности АС"
+  echo "  -l, --list        показать список проверок и выйти"
+  echo "  -h, --help        показать эту справку и выйти"
+  echo "  -v, --version     показать информацию о версии и выйти"
+  echo "Если ПРОВЕРКА не задана, выполняются все проверки"
+}
 
 audit_parms() {
   echo -n "Проверка настроек аудита событий..."
@@ -73,7 +83,7 @@ secdel_control() {
         return 1
       fi
   fi
-  # Проверка гарантированного удаления файлов и папок на всех разделах ext!
+  # Проверка гарантированного удаления файлов и папок на всех разделах с файловой системой семейства ext
   while read line; do
     echo $line | grep ext > /dev/null
     if [ $? -eq 0 ]; then
@@ -82,7 +92,6 @@ secdel_control() {
          echo -e "${Red}ошибка!${NC}"; echo "Очистка освобождаемых блоков не включена на разделе $(echo $line | cut -d' ' -f1)"
          return 1
        fi
-       # TODO Сделать анализ количества проходов случаеного затирания (не менее одного для 1Г и двух для 1В)
     fi
   done < /etc/fstab
   return 0
@@ -396,12 +405,17 @@ check_users(){
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
+    -c|--class)
+      class=$2
+      shift
+      ;;
     -l|--list)
       echo $all_checks
       exit
       ;;
     -h|--help)
-      show_help=true
+      usage
+      exit
       ;;
     -v|--version)
       echo astra-check $VERSION
@@ -420,20 +434,40 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
-if [ -z "$selected_checks" ]; then
-  selected_checks=$all_checks
+if [ -z "$class" ]; then
+  class=1Д
 fi
 
-if $show_help; then
-  echo "Использование: astra-check [-l|-h|-v] [ПРОВЕРКА]..."
-  echo "Проверяет настройки комплекса средств защиты информации ОС Astra Linux SE"
-  echo
-  echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
-  echo "  -l, --list    показать список проверок и выйти"
-  echo "  -h, --help    показать эту справку и выйти"
-  echo "  -v, --version показать информацию о версии и выйти"
-  echo "Если ПРОВЕРКА не задана, выполняются все проверки"
-  exit
+case $class in
+  1Д|2Б|3А|3Б)
+    # регистрация входа (выхода) субъектов доступа в систему (из системы),
+    # на которую флаги аудита влияния не оказывают
+    audflags=0x00000 
+    ;;
+  1Г|2А)
+    # в дополнение к 1Д, 2Б, 3А, 3Б
+    # регистрация выдачи печатных (графических) документов на "твердую" копию
+    # регистрация запуска (завершения) программ и процессов
+    # регистрация попыток доступа программных средств (программ, процессов, задач, заданий) к защищаемым файлам
+    # регистрация попыток доступа программных средств к дополнительным защищаемым объектам доступа
+    audflags=0x1983f
+    ;;
+  1А|1Б|1В)
+    # в дополнение к 1Г, 2А
+    # регистрация изменений полномочий субъектов доступа и статуса объектов доступа 
+    audflags=0x1983f 
+    ;;
+  *)
+    echo "$(basename $0): задан несуществующий класс АС"
+    exit
+    ;;
+esac
+
+echo $audflags
+exit
+
+if [ -z "$selected_checks" ]; then
+  selected_checks=$all_checks
 fi
 
 for check in $selected_checks

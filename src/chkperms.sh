@@ -80,14 +80,14 @@ while read -r line; do
   $show_progress $checks
   ((checks++))
   # Для GNU/Linux параметр -f4-, для Astra Linux -f5-
-  ; fname=$(echo $line | cut -d' ' -f4-) 
+  fname=$(echo $line | cut -d' ' -f4-) 
   # fname=$(echo $line | cut -d' ' -f5-)
   if [ ! -e "${fname}" ]; then
     echo -e "${fname} ...нет такого файла или каталога"
     continue
   fi
   # Для GNU/Linux команда ls, для Astra Linux pdp-ls
-  ; perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
+  perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
   # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
 
   if [ "$line" != "$perms" ]; then
@@ -102,4 +102,4 @@ while read -r line; do
   fi
 done <$file
 
-echo -e \n"Проверено объектов ${checks}, ошибок {$errors}"
+echo "Проверено объектов ${checks}, ошибок ${errors}"
