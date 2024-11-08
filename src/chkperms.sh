@@ -5,6 +5,11 @@
 
 VERSION=1.11
 
+if [ $(id -u) -ne 0 ]; then
+  echo "$(basename $0): запустите программу с правами суперпользователя"
+  exit
+fi
+
 # Используемые escape-последовательности
 none='\033[0m' # Нет цвета
 red='\033[0;31m' # Красный
@@ -19,7 +24,7 @@ usage(){
   echo "Проверяет соответствие прав доступа к файлам и каталогам матрице доступа"
   echo
   echo "  -h, --help     показать эту справку и выйти"
-  echo "  -v, --verbose  показывать успешные проверки"
+  echo "  -v, --verbose  показать успешные проверки"
   echo "  -p, --progress показать индикатор програсса выполнения"
   echo "  --version      показать информацию о версии и выйти"
   echo "  ФАЙЛ           файл с матрицей даступа"
@@ -28,7 +33,7 @@ usage(){
 progress(){
   percent=$(($1 * 100 / ${total}))
   # Количество знаков индикатора прогресса с учетом ширины терминала
-  sharps=$(($1 * ${tcols} / ${total}))
+  sharps=$(($1 * (${tcols} - 5) / ${total}))
   # escape-последовательность для повторения символа перед ней несколько раз (REP) \e[n;b
   # см.: https://invisible-island.net/xterm/ctlseqs/ctlseqs.pdf (стр. 12)
   printf [%d%%]"#\e[%d;b\r" $percent $sharps
@@ -45,7 +50,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     -v|--verbose)
       verbose=true
-      ;; 
+      ;;
     -p|--progress)
       # Присвоить переменной указатель на функцию отображения индикатора прогресса
       show_progress=(progress)
@@ -74,29 +79,27 @@ echo "Проверка прав доступа..."
 while read -r line; do
   $show_progress $checks
   ((checks++))
-  # Раскомментировать следующую строку для GNU/Linux
-  fname=$(echo $line | cut -d' ' -f4-) 
-  # Раскомментировать следующую строку для Astra Linux
+  # Для GNU/Linux параметр -f4-, для Astra Linux -f5-
+  ; fname=$(echo $line | cut -d' ' -f4-) 
   # fname=$(echo $line | cut -d' ' -f5-)
   if [ ! -e "${fname}" ]; then
-    echo -e "${fname}...${red}нет такого файла или каталога${none}"
+    echo -e "${fname} ...нет такого файла или каталога"
     continue
   fi
-  # Раскомментировать следующую строку для GNU/Linux
-  perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
-  # Раскомментировать следующую строку для Astra Linux
+  # Для GNU/Linux команда ls, для Astra Linux pdp-ls
+  ; perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
   # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
 
   if [ "$line" != "$perms" ]; then
     ((errors++))
-    echo -e "${fname}...${red}ошибка${none}${EraseLine}"
+    echo -e "${fname} ...${red}ошибка${none}${EraseLine}"
     continue  
   fi
 
   if [ -n "$verbose" ]; then
     # Вывести сообщение и затереть индикатор прогресса
-    echo -e "${fname}...${green}успешно${none}${EraseLine}"
+    echo -e "${fname} ...${green}успешно${none}${EraseLine}"
   fi
 done <$file
 
-echo "Проверено объектов "$checks", ошибок "$errors
+echo -e \n"Проверено объектов ${checks}, ошибок {$errors}"
