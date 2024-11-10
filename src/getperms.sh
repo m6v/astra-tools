@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-VERSION=1.02
-
 if [ $(id -u) -ne 0 ]; then
   echo "$(basename $0): запустите программу с правами суперпользователя"
   exit
 fi
+
+VERSION=1.02
 
 dir="/"
 

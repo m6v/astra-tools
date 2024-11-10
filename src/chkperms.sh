@@ -3,12 +3,12 @@
 # В зависимости от используемого дистрибутива необходимо
 # закомментировать (раскоммекнтировать) указанные строки
 
-VERSION=1.11
-
 if [ $(id -u) -ne 0 ]; then
   echo "$(basename $0): запустите программу с правами суперпользователя"
   exit
 fi
+
+VERSION=1.11
 
 # Используемые escape-последовательности
 none='\033[0m' # Нет цвета
@@ -87,7 +87,7 @@ while read -r line; do
     continue
   fi
   # Для GNU/Linux команда ls, для Astra Linux pdp-ls
-  perms=$(ls -dal --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
+  perms=$(ls -dl --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
   # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
 
   if [ "$line" != "$perms" ]; then

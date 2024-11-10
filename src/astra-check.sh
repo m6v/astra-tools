@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
-VERSION=1.06
+if [ $(id -u) -ne 0 ]; then
+  echo "$(basename $0): запустите программу с правами суперпользователя"
+  exit
+fi
+
+VERSION=1.07
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
 NC='\033[0m' # No Color
@@ -23,8 +28,11 @@ usage(){
   echo "Если ПРОВЕРКА не задана, выполняются все проверки"
 }
 
+total=0  # Общее число проверок
+failed=0 # Число неуспешных проверок
+
 audit_parms() {
-  echo -n "Проверка настроек аудита событий..."
+  echo -n "Проверка настроек аудита событий ..."
   if [ -z "$(useraud -o)" ]; then
     echo -e "${Red}ошибка!${NC}"; echo "Аудит событий не включен"
     return 1
@@ -44,10 +52,11 @@ audit_parms() {
   return 0
 }
 
-# Далее проверки настроек политик безопасности с помощью инструментов командной строки astra-safepolicy
+# Проверки настроек политик безопасности с помощью инструментов командной строки astra-safepolicy
 # см.: https://wiki.astralinux.ru/pages/viewpage.action?pageId=109020865
+
 swapwiper_control() {
-  echo -n "Проверка очистки разделов страничного обмена..."
+  echo -n "Проверка очистки разделов страничного обмена ..."
   swapconf=/etc/parsec/swap_wiper.conf
   if [ $ASTRA_RELEASE == "1.6" ]; then
     # Параметр q используется, чтобы ничего не писать в stdout, проверяется только код возврата
@@ -73,7 +82,7 @@ swapwiper_control() {
 }
 
 secdel_control() {
-  echo -n "Проверка очистки освобождааемых блоков файловой системы..."
+  echo -n "Проверка очистки освобождааемых блоков файловой системы ..."
     if [ $ASTRA_RELEASE == "1.6" ]; then
     :
   else
@@ -98,7 +107,7 @@ secdel_control() {
 }
 
 mac_control(){
-  echo -n "Проверка режима МРД (мандатного управления доступом)..."
+  echo -n "Проверка режима МРД (мандатного управления доступом) ..."
   max_ilev=$(grep -Po 'parsec.max_ilev=\d*' /proc/cmdline | cut -d= -f2)
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ -z "$max_ilev" ]; then
@@ -121,7 +130,7 @@ mac_control(){
 }
 
 nochmodx_lock(){
-  echo -n "Проверка блокировки установки бита исполнения..."
+  echo -n "Проверка блокировки установки бита исполнения ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ $(cat /parsecfs/nochmodx) -eq 0 ]; then
       echo -e "${Red}ошибка!${NC}"; echo "Блокировка установки бита исполнения не включена"
@@ -138,7 +147,7 @@ nochmodx_lock(){
 }
 
 interpreters_lock(){
-  echo -n "Проверка блокировки интерпретаторов..."
+  echo -n "Проверка блокировки интерпретаторов ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
     # Здесь и в аналогичных проверках, если блокировка никогда не включалась возвращается сообщение об ощибке, в стандартный вывод ничего не пишется
     # Если проверяемая блокировка хоть однажды былы включена, то в зависимости от текущей установки возвращается enabled или disabled
@@ -158,7 +167,7 @@ interpreters_lock(){
 }
 
 macros_lock(){
-  echo -n "Проверка блокировки макросов..."
+  echo -n "Проверка блокировки макросов ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
     result=$(systemctl is-enabled astra-macros-lock 2> /dev/null)
     if [ "$result" != "enabled" ]; then
@@ -180,7 +189,7 @@ ptrace_lock(){
     Функция проверяет значение вывод команды systemctl is-enabled astra-ptrace-lock (для Astra Linux SE 1.6)
     или значение, возвращаемое командой astra-ptrace-lock is-enabled (для Astra Linux SE 1.7)
   '
-  echo -n "Проверка блокировки трассировки ptrace..."
+  echo -n "Проверка блокировки трассировки ptrace ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
     result=$(systemctl is-enabled astra-ptrace-lock 2> /dev/null)
     if [ "$result" != "enabled" ]; then
@@ -202,7 +211,7 @@ sysrq_lock(){
     Функция проверяет значение параметра ядра sysrq (для Astra Linux SE 1.6)
     или значение, возвращаемое командой astra-sysrq-lock is-enabled (для Astra Linux SE 1.7)
   '
-  echo -n "Проверка блокировки клавиш SysRq..."
+  echo -n "Проверка блокировки клавиш SysRq ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ $(cat /proc/sys/kernel/sysrq) -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"; echo "Блокировка клавиш SysRq не включена"
@@ -219,11 +228,11 @@ sysrq_lock(){
 }
 
 shutdown_lock(){
-  echo -n "Проверка блокировки отключения питания..."
+  echo -n "Проверка блокировки отключения питания ..."
   if [ $ASTRA_RELEASE == "1.6" ]; then
-    # TODO Параметр AllowShutdown в секциях [X-:*-Core] и [X-*-Core] (разрешение локального и удаленного выключения питания соответственно)
+    # Параметр AllowShutdown в секциях [X-:*-Core] и [X-*-Core] (разрешение локального и удаленного выключения питания соответственно)
     # файла /etc/X11/fly-dm/fly-dmcc может принимать значения All, Root или None ("Всем", "Только администратору" или "Никому")
-    # В Astra Linux 1.6 astra-shutdown-lock не возвращает текущий статус, только включение или выключени, поэтому парсим вручую
+    # В Astra Linux 1.6 astra-shutdown-lock не возвращает текущий статус, только включение или выключение, поэтому парсим вручую
     allow_shutdown=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('/etc/X11/fly-dm/fly-dmrc'); print(c['X-*-Core']['AllowShutdown'])")
     if [ $allow_shutdown == "All" ]; then
       echo -e "${Red}ошибка!${NC}"; echo "Блокировка отключения питания не включена"
@@ -246,9 +255,9 @@ passwords_policy(){
     Если параметры PASS_MAX_DAYS имеет значения 90, minlen - значение 8,
     параметры lcredit, ucredit и dcredit имеют ненулевые значения, то проверка считается успешной
   '
-  echo -n "Проверка политики паролей..."
+  echo -n "Проверка политики паролей ..."
   while read line; do
-    # NB! В Астре 1.6-10 и 1.7-4 переменные LOGIN_RETRIES и LOGIN_TIMEOUT задаются, но не используются!
+    # NB! Начиная с Астры 1.6-10 переменные LOGIN_RETRIES и LOGIN_TIMEOUT задаются, но не используются!
     # Можно будет упростить код, здесь оставлено для примера парсинга переменных,
     # задаваемых в формате KEY VALUE (количество пробелов между именем и значением произвольное) по одной в строке
     echo $line | grep -E '^PASS_MAX_DAYS|^LOGIN_RETRIES|^LOGIN_TIMEOUT' > /dev/null
@@ -303,7 +312,7 @@ blocking_policy(){
     Функция проверяет значения параметров deny и unlock_time в файле /etc/pam.d/common-account
     Если параметры deny и unlock_time равны 3 и 1800 соответственно, то проверка считается успешной
   '
-  echo -n "Проверка политики блокировки учетных записей..."
+  echo -n "Проверка политики блокировки учетных записей ..."
   # Парсим файл на пары ключ=значение и создаем переменные с соответствующими именами и значениями
   for line in $(grep pam_tally.so /etc/pam.d/common-account | awk '{for(i=1;i<=NF;i++) {if(match($i,/=/)) {print $i} } }'); do
     key=$(echo $line | cut -d'='  -f1)
@@ -341,7 +350,7 @@ logrotate_parms(){
     Функция проверяет наличие в файле /etc/logrotate.conf параметра daily и значение параметра rotate
     если параметр daily задан, а параметр rotate больше или равен 32, то проверка считается успешной
   '
-  echo -n "Проверка периодичности ротации журналов регистрации событий..."
+  echo -n "Проверка периодичности ротации журналов регистрации событий ..."
   result=0
   if [ -z "$(grep -E '^daily' /etc/logrotate.conf)" ]; then
     ((result++))
@@ -364,7 +373,7 @@ parsec_tests_installed(){
   : '
     Функция проверяет, что пакет parsec-tests установлен
   '
-  echo -n "Проверка установки средств тестирования подсистемы безопасности PARSEC..."
+  echo -n "Проверка установки средств тестирования подсистемы безопасности PARSEC ..."
   if [ -z "$(dpkg -l | grep parsec-tests)" ]; then
     echo -e "${Red}ошибка!${NC}"; echo "Средства тестирования подсистемы безопасности PARSEC не установлены"
     return 1
@@ -377,22 +386,29 @@ show_groups(){
   '
   echo "Группы пользователей, созданные после установки системы:"
   getent group | awk -F: '{ if ($3 >= 1000 && $3 < 60000) printf " %s", $1}'; echo
-  # echo "Доменные группы пользователей:"
-  # ald-admin group-list
+  # TODO Указать полный путь к команде
+  # if [ -f ald-admin ]; then
+  #   echo "Доменные группы пользователей:"
+  #   ald-admin group-list
+  # fi
 }
 
 show_users(){
   echo "Пользователи, имеющие право интерактивного входа в систему:"
   getent passwd | sort | awk -F: '{if (match($NF, "/bin/(ba)?sh")) { system("groups " $1); system("pdpl-user " $1)}}' 
-  # echo "Доменные пользователи:"
-  # ald-admin user-list | awk '{system ("groups "$1); system("sudo pdpl-user " $1)}'
+  # TODO Указать полный путь к команде
+  # if [ -f ald-admin ]; then
+  #   echo "Доменные пользователи:"
+  #   ald-admin user-list | awk '{system ("groups "$1); system("sudo pdpl-user " $1)}'
+  # fi
 }
 
 check_users(){
   : '
-    Функция сравненивает эталонные настройки учетных записей пользователей, сохраненные в файле users.lst, с текущими настройками
+    Функция сравненивает эталонные настройки учетных записей пользователей,
+    сохраненные в файле users.lst, с текущими настройками
   '
-  echo -n "Проверка учетных записей пользователей, созданных после установки системы..."
+  echo -n "Проверка учетных записей пользователей, созданных после установки системы ..."
   # Учетные записи сортируются в алфавитном порядке, т.к. важен не порядок их создания, а само наличие и правильные настройки
   # В дополнение к оболочке /bin/bash проверяем /bin/sh, т.к. в некоторых случаях может быть установлена она
   diff=$(getent passwd | sort | awk -F: '{if (match($NF, "/bin/(ba)?sh")) { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst)
@@ -435,7 +451,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ -z "$class" ]; then
-  class=1Д
+  class="1Г"
 fi
 
 case $class in
@@ -463,19 +479,20 @@ case $class in
     ;;
 esac
 
-echo $audflags
-exit
-
 if [ -z "$selected_checks" ]; then
   selected_checks=$all_checks
 fi
 
 for check in $selected_checks
   do
+    ((total++))
     $check
     if [ $? -eq 0 ]; then
       echo -e "${Green}успешно!${NC}"
+    else
+      ((failed++))
     fi
   done
+echo "Выполнено проверок ${total}, неуспешных ${failed}"
 
 exit
