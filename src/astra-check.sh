@@ -28,26 +28,23 @@ usage(){
   echo "Если ПРОВЕРКА не задана, выполняются все проверки"
 }
 
-total=0  # Общее число проверок
-failed=0 # Число неуспешных проверок
-
 audit_parms(){
   echo -n "Проверка настроек аудита событий ..."
   if [ -z "$(useraud -o)" ]; then
     echo -e "${Red}ошибка!${NC}"
-    echo "Аудит событий не включен"
+    echo "Аудит событий не включен" >&2
     return 1
   else
     sucess_events=($(useraud -on | cut -d: -f1))
     fail_events=($(useraud -on | cut -d: -f2))
     if [ $(($sucess_events & $((audflags)))) != $((audflags)) ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Настройки аудита событий не соответствуют эталону"
+      echo "Настройки аудита событий не соответствуют эталону" >&2
       return 1
     fi
     if [ $(($fail_events & $((audflags)))) != $((audflags)) ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Настройки аудита событий не соответствует эталону"
+      echo "Настройки аудита событий не соответствует эталону" >&2
       return 1
     fi
   fi
@@ -65,14 +62,14 @@ swapwiper_control(){
     grep -q ENABLED=Y $swapconf
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Очистка разделов страничного обмена не включена"
+      echo "Очистка разделов страничного обмена не включена" >&2
       return 1
     fi
   else
     astra-swapwiper-control status 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Очистка разделов страничного обмена не включена"
+      echo "Очистка разделов страничного обмена не включена" >&2
       return 1
     fi
   fi
@@ -80,7 +77,7 @@ swapwiper_control(){
   ignored_part=$(grep IGNORE= $swapconf | cut -d'"' -f2)
     if [ -n "$ignored_part" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Игнорируется раздел подкачки $ignored_part"
+      echo "Игнорируется раздел подкачки $ignored_part" >&2
       return 1
     fi
   return 0
@@ -94,7 +91,7 @@ secdel_control(){
     astra-secdel-control status 1> /dev/null
       if [ $? -ne 0 ]; then
         echo -e "${Red}ошибка!${NC}"
-        echo "Очистка освобождаемых блоков файловой системы не включена"
+        echo "Очистка освобождаемых блоков файловой системы не включена" >&2
         return 1
       fi
   fi
@@ -105,7 +102,7 @@ secdel_control(){
        secdelrnd=$(echo $line | grep -o -E "secdelrnd=[0-9]")
        if [ -z "$secdelrnd" ]; then
          echo -e "${Red}ошибка!${NC}"
-         echo "Очистка освобождаемых блоков не включена на разделе $(echo $line | cut -d' ' -f1)"
+         echo "Очистка освобождаемых блоков не включена на разделе $(echo $line | cut -d' ' -f1)" >&2
          return 1
        fi
     fi
@@ -119,21 +116,21 @@ mac_control(){
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ -z "$max_ilev" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Режим МРД не включен"
+      echo "Режим МРД не включен" >&2
       return 1
     fi
   else
     astra-mac-control is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Режим МРД не включен!"
+      echo "Режим МРД не включен!" >&2
       return 1
     fi
   fi
 
   if [ $max_ilev -eq 0 ]; then
     echo -e "${Red}ошибка!${NC}"
-    echo "Максимально допустимый уровень целостности имеет нулевое значение"
+    echo "Максимально допустимый уровень целостности имеет нулевое значение" >&2
     return 1
   fi
   return 0
@@ -144,14 +141,14 @@ nochmodx_lock(){
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ $(cat /parsecfs/nochmodx) -eq 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка установки бита исполнения не включена"
+      echo "Блокировка установки бита исполнения не включена" >&2
       return 1
     fi
   else
     astra-nochmodx-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка установки бита исполнения не включена"
+      echo "Блокировка установки бита исполнения не включена" >&2
       return 1
     fi
   fi
@@ -168,14 +165,14 @@ interpreters_lock(){
     result=$(systemctl is-enabled astra-interpreters-lock 2> /dev/null)
     if [ "$result" != "enabled" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка интерпретаторов не включена"
+      echo "Блокировка интерпретаторов не включена" >&2
       return 1
     fi
   else
     astra-interpreters-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка интерпретаторов не включена"
+      echo "Блокировка интерпретаторов не включена" >&2
       return 1
     fi
   fi
@@ -188,14 +185,14 @@ macros_lock(){
     result=$(systemctl is-enabled astra-macros-lock 2> /dev/null)
     if [ "$result" != "enabled" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка макросов не включена"
+      echo "Блокировка макросов не включена" >&2
       return 1
     fi
   else
     astra-macros-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка макросов не включена"
+      echo "Блокировка макросов не включена" >&2
       return 1
     fi
   fi
@@ -212,14 +209,14 @@ ptrace_lock(){
     result=$(systemctl is-enabled astra-ptrace-lock 2> /dev/null)
     if [ "$result" != "enabled" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка трассировки ptrace не включена"
+      echo "Блокировка трассировки ptrace не включена" >&2
       return 1
     fi
   else
     astra-ptrace-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка трассировки ptrace не включена"
+      echo "Блокировка трассировки ptrace не включена" >&2
       return 1
     fi
   fi
@@ -235,14 +232,14 @@ sysrq_lock(){
   if [ $ASTRA_RELEASE == "1.6" ]; then
     if [ $(cat /proc/sys/kernel/sysrq) -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка клавиш SysRq не включена"
+      echo "Блокировка клавиш SysRq не включена" >&2
       return 1
     fi
   else
     astra-sysrq-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка клавиш SysRq не включена"
+      echo "Блокировка клавиш SysRq не включена" >&2
       return 1
     fi
   fi
@@ -258,14 +255,14 @@ shutdown_lock(){
     allow_shutdown=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('/etc/X11/fly-dm/fly-dmrc'); print(c['X-*-Core']['AllowShutdown'])")
     if [ $allow_shutdown == "All" ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка отключения питания не включена"
+      echo "Блокировка отключения питания не включена" >&2
       return 1
     fi
   else
     astra-shutdown-lock is-enabled 1> /dev/null
     if [ $? -ne 0 ]; then
       echo -e "${Red}ошибка!${NC}"
-      echo "Блокировка отключения питания не включена"
+      echo "Блокировка отключения питания не включена" >&2
       return 1
     fi
   fi
@@ -293,7 +290,7 @@ passwords_policy(){
   done < /etc/login.defs
 
   if [ $PASS_MAX_DAYS -ne 90 ]; then
-    echo "Максимальное количество дней между сменами пароля задано неверно"
+    echo "Максимальное количество дней между сменами пароля задано неверно" >&2
     ((result++))
   fi
 
@@ -306,14 +303,14 @@ passwords_policy(){
   # echo $minlen $lcredit $ucredit $dcredit
 
   if [ $minlen -lt 8 ]; then
-    echo "Требование к минимальной длине пароля задано неверно"
+    echo "Требование к минимальной длине пароля задано неверно" >&2
     ((result++))
   fi
 
   # В этой и последующих проверках значения могут быть не установлены,
   # в этом случае присваиваем им дефолтное значение ноль, а затем проверяем на равенство нулю
   if [ ${lcredit:-0} -eq 0 ]; then
-    echo "Требование к количеству строчных букв в пароле задано неверно"
+    echo "Требование к количеству строчных букв в пароле задано неверно" >&2
     ((result++))
   fi
 
@@ -323,7 +320,7 @@ passwords_policy(){
   fi
 
   if [ ${dcredit:-0} -eq 0 ]; then
-    echo "Требование к количеству цифр букв в пароле задано неверно"
+    echo "Требование к количеству цифр букв в пароле задано неверно" >&2
     ((result++))
   fi
   
@@ -350,21 +347,21 @@ blocking_policy(){
 
   # Проверяем значения переменных $deny и $unlock_time
   if [ -z "$deny" ] || [ -z "$unlock_time" ]; then
-    echo "Число неуспешных попыток аутентификации и/или период блокировки не заданы"
+    echo "Число неуспешных попыток аутентификации и/или период блокировки не заданы" >&2
     result=1
   else
       if [ $deny -ne 3 ]; then
-        echo "Число неуспешных попыток аутентификации до блокирования учетной записи задано неверно"
+        echo "Число неуспешных попыток аутентификации до блокирования учетной записи задано неверно" >&2
         ((result++))
       fi
       if [ $unlock_time -ne 1800 ]; then
-        echo "Период разблокирования задан неверно"
+        echo "Период разблокирования задан неверно" >&2
         ((result++))
       fi
 
       # Аналогичный параметр per_user устанавливается в файле /etc/pam.d/common-auth
       if [ -n "$(grep per_user /etc/pam.d/common-account)" ]; then
-        echo "Назначены индивидуальные настройки параметров блокировки учетных записей"
+        echo "Назначены индивидуальные настройки параметров блокировки учетных записей" >&2
         ((result++))
       fi
   fi
@@ -396,8 +393,8 @@ logrotate_parms(){
 
   if [ $result -ne 0 ]; then
     echo -e "${Red}ошибка!${NC}"
-    echo "Параметры периодичности ротации журналов регистрации событий настроены неверно"
-    echo "Проверьте файл /etc/logrotate.conf"
+    echo "Параметры периодичности ротации журналов регистрации событий настроены неверно" >&2
+    echo "Проверьте файл /etc/logrotate.conf" >&2
   fi
   return $result
 }
@@ -409,7 +406,7 @@ parsec_tests_installed(){
   echo -n "Проверка установки средств тестирования подсистемы безопасности PARSEC ..."
   if [ -z "$(dpkg -l | grep parsec-tests)" ]; then
     echo -e "${Red}ошибка!${NC}"
-    echo "Средства тестирования подсистемы безопасности PARSEC не установлены"
+    echo "Средства тестирования подсистемы безопасности PARSEC не установлены" >&2
     return 1
   fi
 }
@@ -450,7 +447,7 @@ check_users(){
   diff=$(getent passwd | sort | awk -F: '{if (match($NF, "/bin/(ba)?sh")) { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst)
   if [ $? -ne 0 ]; then
     echo -e "${Red}ошибка!${NC}"
-    echo "Настройки учетных записей пользователей не соответствуют эталонным"
+    echo "Настройки учетных записей пользователей не соответствуют эталонным" 
     getent passwd | sort | awk -F: '{if ($NF=="/bin/bash") { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst
     return 1
   fi
@@ -466,7 +463,7 @@ fi
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     -c|--class)
-      # Считать класс защищенности АС
+      # Аргумент параметра -c это класс защищенности АС
       class=$2
       shift
       ;;
@@ -501,8 +498,7 @@ fi
 
 case $class in
   1Д|2Б|3А|3Б)
-    # регистрация входа (выхода) субъектов доступа в систему (из системы),
-    # на которую флаги аудита влияния не оказывают
+    # только регистрация входа (выхода) субъектов доступа в систему (из системы), на которую флаги аудита влияния не оказывают
     audflags=0x00000 
     ;;
   1Г|2А)
@@ -527,6 +523,9 @@ esac
 if [ -z "$selected_checks" ]; then
   selected_checks=$all_checks
 fi
+
+total=0  # Общее число проверок
+failed=0 # Число неуспешных проверок
 
 for check in $selected_checks
   do
