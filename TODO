@@ -4,36 +4,25 @@
 В проверке secdel_control сделать анализ количества проходов случайного затирания (не менее одного для 1Г и двух для 1В)
 
 Попробовать парсить записи afick'а в syslog вида:
-Nov 13 16:12:06 astra-afck afick: # Hash database : 2103 files scanned, 0 changed (new : 0; delete : 0; changed : 0; dangling : 0; exclude_suffix : 1; exclude_prefix : 0; exclude_re : 0; degraded : 0)
+Nov 13 16:12:06 astra-afck afick: # Hash database : 2103 files scanned, 0 changed (new : 0; delete : 0; changed : 0)
 
 1) grep -E 'Hash database' syslog | tail -1 | grep -o '([^)]*)'
 
-(new : 0; delete : 0; changed : 0; dangling : 0; exclude_suffix : 1; exclude_prefix : 0; exclude_re : 0; degraded : 0)
+(new : 0; delete : 0; changed : 0)
 
 2) grep -E 'Hash database' syslog | tail -1 | sed 's/.*(//; s/).*//'
-new : 0; delete : 0; changed : 0; dangling : 0; exclude_suffix : 1; exclude_prefix : 0; exclude_re : 0; degraded : 0
+new : 0; delete : 0; changed : 0
 
 3) grep -E 'Hash database' syslog | tail -1 | grep -o '[a-z_]* : [0-9]*'
-database : 2103
 new : 0
 delete : 0
 changed : 0
-dangling : 0
-exclude_suffix : 1
-exclude_prefix : 0
-exclude_re : 0
-degraded : 0
 
 4) grep -E 'Hash database' syslog | tail -1 | grep -o '[a-z_]* : [0-9]*' | cut -d' ' -f1,3
-database 2103
 new 0
 delete 0
 changed 0
-dangling 0
-exclude_suffix 1
-exclude_prefix 0
-exclude_re 0
-degraded 0
+
 
 NB!
 При запуске pdp-pl с правами root'а у некоторых объектов в /etc/parsec в представлении дискреционных прав доступа появляется последний бит 'a', а при запуске от обычного пользователя его нет! Поэтому всегда запускаем скрипты с использованием sudo!

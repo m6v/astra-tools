@@ -539,4 +539,4 @@ for check in $selected_checks
   done
 echo "Выполнено проверок ${total}, неуспешных ${failed}"
 
-exit
+exit $failed

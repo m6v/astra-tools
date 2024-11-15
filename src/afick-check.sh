@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 Red='\033[0;31m' # Red
 Green='\033[0;32m' # Green
 
-all_checks="parms results"
+all_checks="status results"
 
 usage(){
   echo "Использование: afick-check -h|-v|--version|ФАЙЛ"
@@ -24,7 +24,21 @@ usage(){
   echo "  --version показать информацию о версии и выйти"
 }
 
-parms(){
+settings(){
+  echo -n "Проверка настроек средства регламентного контроля целостности ..."
+  diff -y $fname /etc/afick.conf > /tmp/afick.diff
+  if [ $? -ne 0 ]; then
+    echo -e "${Red}ошибка!${NC}"
+    echo "Настройки средства регламентного контроля целостности не соответствуют эталонным" >&2
+    echo "Сравните файл /etc/afick.conf с эталонным, устраните несоответствия и повторите проверку" >&2
+    if [ -n "$verbose" ]; then
+      cat /tmp/afick.diff
+    fi
+    return 1
+  fi
+}
+
+status(){
   : '
     Функция проверяет состояние службы afick и код возврата последнего запуска.
     Если служба включена (enabled) и код возврата нулевой, проверка считается успешной
@@ -55,31 +69,24 @@ parms(){
   fi
 }
 
-objects(){
-  echo -n "Проверка настроек средства регламентного контроля целостности ..."
-  diff $fname /etc/afick.conf &> /dev/null
-  if [ $? -ne 0 ]; then
-    echo -e "${Red}ошибка!${NC}"
-    echo "Настройки средства регламентного контроля целостности не соответствуют эталонным" >&2
-    echo "Сравните файл /etc/afick.conf с эталонным, устраните несоответствия и повторите проверку" >&2
-    return 1
-  fi
-}
-
 results(){
-  echo -n "Проверка целостности контролируемых объектов ..."
+  echo -n "Проверка результатов контроля целостности ..."
   afick -k &> /tmp/afick.res
   result=$?
+
   if [ $result -ne 0 ]; then
     echo -e "${Red}ошибка!${NC}"
     last_res=$(grep -E 'Hash database' /var/log/syslog | tail -1)
+    # Вывести дату и время последней проверки
     echo $(echo $last_res | cut -d' ' -f1-3)
+    # Вывести сводку с результатами последней проверки
     echo $last_res | grep -o '[a-z_]* : [0-9]*' | cut -d' ' -f1,3
   fi
 
   if [ -n "$verbose" ]; then
     echo
-    cat /tmp/afick.res
+    # Пропустить в отчете строки с комментариями
+    grep -v '^#' /tmp/afick.res
   fi
 
   return $result
@@ -105,7 +112,7 @@ while [[ "$#" -gt 0 ]]; do
         exit
       fi
       # Если файл с эталонными настройками задан, добавляем проверку сравнения с ним
-      all_checks+=" objects"
+      all_checks+=" settings"
       ;;
   esac
   shift
@@ -125,3 +132,5 @@ for check in $all_checks
     fi
   done
 echo "Выполнено проверок ${total}, неуспешных ${failed}"
+
+exit $failed
