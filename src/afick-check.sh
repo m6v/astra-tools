@@ -5,7 +5,7 @@ if [ $(id -u) -ne 0 ]; then
   exit
 fi
 
-VERSION=1.06
+VERSION=1.08
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
 NC='\033[0m' # No Color
@@ -19,6 +19,7 @@ usage(){
   echo "Проверяет соответствие настроек средства регламентного контроля целостности эталонным, заданным в ФАЙЛе"
   echo
   echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
+  echo "  -s, --scan    выполнить контроль целостности и выйти"
   echo "  -h, --help    показать эту справку и выйти"
   echo "  -v, --verbose показать вывод средства регламентного контроля целостности"
   echo "  --version показать информацию о версии и выйти"
@@ -69,31 +70,48 @@ status(){
   fi
 }
 
-results(){
-  echo -n "Проверка результатов контроля целостности ..."
+scan(){
+  echo -n "Контроль целостности ..."
   afick -k &> /tmp/afick.res
   result=$?
 
   if [ $result -ne 0 ]; then
     echo -e "${Red}ошибка!${NC}"
-    last_res=$(grep -E 'Hash database' /var/log/syslog | tail -1)
-    # Вывести дату и время последней проверки
-    echo $(echo $last_res | cut -d' ' -f1-3)
-    # Вывести сводку с результатами последней проверки
-    echo $last_res | grep -o '[a-z_]* : [0-9]*' | cut -d' ' -f1,3
-  fi
-
-  if [ -n "$verbose" ]; then
-    echo
     # Пропустить в отчете строки с комментариями
     grep -v '^#' /tmp/afick.res
+  else
+    echo "${Green}успешно!${NC}"
   fi
 
-  return $result
+  exit $result
+}
+
+results(){
+  echo -n "Проверка результатов контроля целостности ..."
+  last_res=$(grep -E 'Hash database' /var/log/syslog | tail -1)
+  # Вывести дату и время последней проверки
+  date=$(echo $last_res | cut -d' ' -f1-3)
+  # Вывести сводку с результатами последней проверки
+  # echo $last_res | grep -o '[a-z_]* : [0-9]*' | cut -d' ' -f1,3
+  # echo $last_res | grep -o '[a-z_]* : [0-9]*;' | sed 's/\s:\s/=/g'
+  for item in $(echo $last_res | grep -o '[a-z_]* : [0-9]*;' | sed 's/\s:\s/=/g')
+    do
+      eval $item
+    done
+  if [ $(($new+$delete+$changed)) -ne 0 ]; then
+    echo -e "${Red}ошибка!${NC}"
+    # Преобразовать дату из формата 'Nov 18 10:19:40' в '2024-11-18 10:19:40'
+    echo 'Последняя проверка: '$(date -d"$date" "+%F %T")
+    echo 'Новых: '$new', удаленных: '$delete', измененных: '$changed
+    return 1
+  fi
 }
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
+    -s|--scan)
+      scan
+      ;;
     -h|--help)
       usage
       exit
