@@ -85,7 +85,7 @@ swapwiper_control(){
 
 secdel_control(){
   echo -n "Проверка очистки освобождааемых блоков файловой системы ..."
-    if [ $ASTRA_RELEASE == "1.6" ]; then
+  if [ $ASTRA_RELEASE == "1.6" ]; then
     :
   else
     astra-secdel-control status 1> /dev/null
@@ -97,9 +97,9 @@ secdel_control(){
   fi
   # Проверка гарантированного удаления файлов и папок на всех разделах с файловой системой семейства ext
   while read line; do
-    echo $line | grep ext > /dev/null
+    echo $line | grep -q ext
     if [ $? -eq 0 ]; then
-       secdelrnd=$(echo $line | grep -o -E "secdelrnd=[0-9]")
+       secdelrnd=$(echo $line | grep -oE "secdelrnd=[0-9]")
        if [ -z "$secdelrnd" ]; then
          echo -e "${Red}ошибка!${NC}"
          echo "Очистка освобождаемых блоков не включена на разделе $(echo $line | cut -d' ' -f1)" >&2
@@ -281,7 +281,7 @@ passwords_policy(){
     # NB! Начиная с Астры 1.6-10 переменные LOGIN_RETRIES и LOGIN_TIMEOUT задаются, но не используются!
     # Можно будет упростить код, здесь оставлено для примера парсинга переменных,
     # задаваемых в формате KEY VALUE (количество пробелов между именем и значением произвольное) по одной в строке
-    echo $line | grep -E '^PASS_MAX_DAYS|^LOGIN_RETRIES|^LOGIN_TIMEOUT' > /dev/null
+    echo $line | grep -q -E '^PASS_MAX_DAYS|^LOGIN_RETRIES|^LOGIN_TIMEOUT'
     if [ $? -eq 0 ]; then
       key=$(echo $line | cut -d' '  -f1)
       value=$(echo $line | cut -d' ' -f2)
@@ -335,7 +335,7 @@ passwords_policy(){
 blocking_policy(){
   : '
     Функция проверяет значения параметров deny и unlock_time в файле /etc/pam.d/common-account
-    Если параметры deny и unlock_time равны 3 и 1800 соответственно, то проверка считается успешной
+    Если параметры deny и unlock_time больше или равны 3 и 1800 соответственно, то проверка считается успешной
   '
   # Парсим файл на пары ключ=значение и создаем переменные с соответствующими именами и значениями
   result=0
@@ -350,11 +350,11 @@ blocking_policy(){
     echo "Число неуспешных попыток аутентификации и/или период блокировки не заданы" >&2
     result=1
   else
-      if [ $deny -ne 3 ]; then
+      if [ $deny -ge 3 ]; then
         echo "Число неуспешных попыток аутентификации до блокирования учетной записи задано неверно" >&2
         ((result++))
       fi
-      if [ $unlock_time -ne 1800 ]; then
+      if [ $unlock_time -ge 1800 ]; then
         echo "Период разблокирования задан неверно" >&2
         ((result++))
       fi
@@ -476,7 +476,7 @@ while [[ "$#" -gt 0 ]]; do
       exit
       ;;
     -v|--version)
-      echo astra-check $VERSION
+      echo $(basename $0) $VERSION
       exit
       ;;
     *)

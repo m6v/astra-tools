@@ -15,28 +15,31 @@ Green='\033[0;32m' # Green
 all_checks="status results"
 
 usage(){
-  echo "Использование: afick-check -h|-v|--version|ФАЙЛ"
-  echo "Проверяет соответствие настроек средства регламентного контроля целостности эталонным, заданным в ФАЙЛе"
+  echo "Использование: $(basename $0) [-h|-v|--version] [ФАЙЛ]"
+  echo "Проверяет настройки средства регламентного контроля целостности,"
+  echo "сравнивает конфигурационный файл и эталонным ФАЙЛОМ"
   echo
   echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
   echo "  -s, --scan    выполнить контроль целостности и выйти"
   echo "  -h, --help    показать эту справку и выйти"
   echo "  -v, --verbose показать вывод средства регламентного контроля целостности"
-  echo "  --version показать информацию о версии и выйти"
+  echo "      --version показать информацию о версии и выйти"
 }
 
 settings(){
   echo -n "Проверка настроек средства регламентного контроля целостности ..."
-  diff -y $fname /etc/afick.conf > /tmp/afick.diff
-  if [ $? -ne 0 ]; then
-    echo -e "${Red}ошибка!${NC}"
+  diff $fname /etc/afick.conf > /tmp/afick.diff
+  if [ $? -eq 0 ]; then
+    return 0
+  fi
+
+  echo -e "${Red}ошибка!${NC}"
+  if [ -n "$verbose" ]; then
     echo "Настройки средства регламентного контроля целостности не соответствуют эталонным" >&2
     echo "Сравните файл /etc/afick.conf с эталонным, устраните несоответствия и повторите проверку" >&2
-    if [ -n "$verbose" ]; then
-      cat /tmp/afick.diff
-    fi
-    return 1
+    cat /tmp/afick.diff
   fi
+  return 1
 }
 
 status(){
@@ -90,6 +93,13 @@ results(){
   echo -n "Проверка результатов контроля целостности ..."
   # Получить сводку последней проверки целостности
   last_res=$(grep -E 'Hash database' /var/log/syslog | tail -1)
+  if [ -z "$last_res" ]; then
+    echo -e "${Red}ошибка!${NC}"
+    echo "В системном логе /var/log/syslog результаты контроля целостности не найдены"
+    echo "Выполните команду sudo systemctl restart afick и повторите проверку"
+    return 1
+  fi
+
   # Дата и время последней проверки целостности
   date=$(echo $last_res | cut -d' ' -f1-3)
   # Найти в сводке значения, соответствующие шаблону item : value; привести их к виду item=value;
@@ -120,13 +130,13 @@ while [[ "$#" -gt 0 ]]; do
       verbose=true
       ;;
     --version)
-      echo afick-check $VERSION
+      echo $(basename $0) $VERSION
       exit
       ;;
     *)
       fname=$1
       if [ ! -f $fname ]; then
-        echo "afick-check:" $fname "нет такого файла"
+        echo "$(basename $0):" $fname "нет такого файла"
         exit
       fi
       # Если файл с эталонными настройками задан, добавляем проверку сравнения с ним
