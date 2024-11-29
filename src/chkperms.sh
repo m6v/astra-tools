@@ -86,7 +86,7 @@ while read -r line; do
     echo -e "${fname} ...нет такого файла или каталога"
     continue
   fi
-  # Для GNU/Linux команда ls, для Astra Linux pdp-ls
+  # Для GNU/Linux команда ls -dl, для Astra Linux pdp-ls -daM
   perms=$(ls -dl --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
   # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
 
