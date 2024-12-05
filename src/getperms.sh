@@ -13,10 +13,10 @@ usage() {
     echo "если каталог не задан, то начиная с корневого каталога"
     echo
     echo "  -h, --help    показать эту справку и выйти"
-    echo "  -v. --version показать информацию о версии и выйти"
+    echo "  -v, --version показать информацию о версии и выйти"
 }
 
-while [[ "$#" -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
     case $1 in
         -h|--help)
              usage
@@ -41,17 +41,15 @@ if [ -z "$dirs" ]; then
     dirs="/"
 fi
 
-# Присвоить переменной NAME имя дистрибутива
-eval $(grep ^NAME /etc/os-release)
+# Присвоить переменной ID идентификатор дистрибутива
+eval $(grep ^ID= /etc/os-release)
 # Сформировать шаблон команды чтения атрибутов объектов доступа
-if [ "$NAME" == "Astra Linux" ]; then
+if [ "$ID" == "astra" ]; then
     cmd="find %s \! -type l -exec pdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,4-"
 else
     cmd="find %s \! -type l -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-"
 fi
 
-for dir in $dirs
-do
+for dir in $dirs; do
     eval $(printf "$cmd" "$dir")
 done
-

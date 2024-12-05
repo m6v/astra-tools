@@ -14,7 +14,7 @@ Green='\033[0;32m' # Green
 
 all_checks="audit_parms swapwiper_control secdel_control mac_control \
             nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
-            passwords_policy blocking_policy logrotate_parms parsec_tests_installed"
+            passwords_policy blocking_policy logrotate_parms parsec_tests"
 
 usage(){
     echo "Использование: $(basename $0) [-l|-h|-v|-c КЛАСС] [ПРОВЕРКА]..."
@@ -399,7 +399,7 @@ logrotate_parms(){
     return $result
 }
 
-parsec_tests_installed(){
+parsec_tests(){
     : '
       Функция проверяет, что пакет parsec-tests установлен
     '
@@ -451,6 +451,18 @@ check_users(){
         getent passwd | sort | awk -F: '{if ($NF=="/bin/bash") { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst
         return 1
     fi
+}
+
+network(){
+    : '
+      Функция проверяет сетевое взаимодействие с хостами, адреса которых есть в arp-таблице
+    '
+    result=0
+    ip n | awk '{system("ping -c 1 " $1)}'
+    if [ $? -ne 0 ]; then
+        ((result++))
+    fi
+    return $result
 }
 
 # Проверить запустили саму программу или симлинк на нее,

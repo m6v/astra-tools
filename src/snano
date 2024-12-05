@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 
-if [ $# -eq 0 ]
-then
+if [ $# -eq 0 ]; then
     echo 'snano.sh: Нужно указать имя файла'
     exit
 fi
 
-
-
-if [ -f $1 ]
-then
-    # Если файл в одном из заданных каталогов, открываем его на редактирование
-    case $(dirname $1) in ('/etc/NetworkManager') nano $1; exit ;; esac
-    # Если файл находится в заданном списке, открываем его на редактирование
-    case $1 in ('/etc/fstab'|'/etc/hostname'|'/etc/hosts'|'/etc/group') nano $1 ;; (*) echo $1': Отказано в доступе' ;; esac
-
-else
+if [ ! -f $1 ]; then
     echo $1': Не существует'
-fi
+    exit
+
+# Если файл в одном из заданных каталогов, открываем его на редактирование
+case $(dirname $1) in
+    ('/etc/NetworkManager')
+        nano $1
+        exit
+        ;;
+esac
+# Если файл находится в заданном списке, открываем его на редактирование
+case $1 in
+    ('/etc/fstab'|'/etc/hostname'|'/etc/hosts'|'/etc/group')
+        nano $1
+        ;;
+    (*)
+        echo $1': Отказано в доступе'
+        ;;
+esac
