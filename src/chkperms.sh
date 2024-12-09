@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
-# Скрипт для проверки соответствия прав матрице доступа
-# В зависимости от используемого дистрибутива необходимо
-# закомментировать (раскоммекнтировать) указанные строки
 
 if [ $(id -u) -ne 0 ]; then
     echo "$(basename $0): запустите программу с правами суперпользователя"
     exit
 fi
 
-VERSION=1.11
+VERSION=1.13
 
 # Используемые escape-последовательности
-none='\033[0m' # Нет цвета
+el='\033[K' # Стереть от курсора до конца строки
+nc='\033[0m' # Нет цвета
 red='\033[0;31m' # Красный
 green='\033[0;32m' # Зеленый
-EraseLine='\033[K' # Стереть от курсора до конца строки
 
 checks=0
 errors=0
@@ -75,30 +72,43 @@ total=$(cat $file | wc -l)
 # Поучить число колонок в окне терминала 
 tcols=$(tput cols)
 
+# Присвоить переменной ID идентификатор дистрибутива
+eval $(grep ^ID= /etc/os-release)
+
+# Определить функции чтения имени объекта и его прав доступа
+# в зависимости от используемого дистрибутива Linux
+if [ "$ID" == "astra" ]; then
+    # В Astra Linux имя объекта записывается начиная с пятого поля
+    getfname(){ echo $@ | cut -d' ' -f5- ;}
+    # Делаем с помошью eval, т.к. иначе проблемы с файлами в именах которых есть пробелы!
+    getperms(){ eval "pdp-ls -daM --time-style=+ '$@' | cut -d' ' -f1,4-";}
+else
+    # В GNU/Linux имя объекта записывается начиная с пятого поля
+    getfname(){ echo $@ | cut -d' ' -f4- ;}
+    getperms(){ eval "ls -dl --time-style=+ '$@' | cut -d' ' -f1,3,4,7-";}
+fi
+
 echo "Проверка прав доступа..."
 while read -r line; do
     $show_progress $checks
     ((checks++))
-    # Для GNU/Linux параметр -f4-, для Astra Linux -f5-
-    fname=$(echo $line | cut -d' ' -f4-) 
-    # fname=$(echo $line | cut -d' ' -f5-)
+    fname=$(getfname $line)
     if [ ! -e "${fname}" ]; then
         echo -e "${fname} ...нет такого файла или каталога"
         continue
     fi
-    # Для GNU/Linux команда ls -dl, для Astra Linux pdp-ls -daM
-    perms=$(ls -dl --time-style=+ "$fname" | cut -d' ' -f1,3,4,7-)
-    # perms=$(pdp-ls -daM --time-style=+ "$fname" | cut -d' ' -f1,4-)
-
-    if [ "$line" != "$perms" ]; then
+    # Получить прав доступа очередного объекта
+    perms=$(getperms $fname)
+    # Сравнить полученные права доступа с правами в матрице доступа
+    if [ "$perms" != "$line" ]; then
         ((errors++))
-        echo -e "${fname} ...${red}ошибка${none}${EraseLine}"
+        echo -e "${fname} ...${red}ошибка${nc}${el}"
         continue  
     fi
 
     if [ -n "$verbose" ]; then
         # Вывести сообщение и затереть индикатор прогресса
-        echo -e "${fname} ...${green}успешно${none}${EraseLine}"
+        echo -e "${fname} ...${green}успешно${nc}${el}"
     fi
 done <$file
 

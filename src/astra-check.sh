@@ -8,9 +8,10 @@ fi
 VERSION=1.07
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
-NC='\033[0m' # No Color
-Red='\033[0;31m' # Red
-Green='\033[0;32m' # Green
+# Используемые escape-последовательности
+NC='\033[0m' # Нет цвета
+Red='\033[0;31m' # Красный
+Green='\033[0;32m' # Зеленый
 
 all_checks="audit_parms swapwiper_control secdel_control mac_control \
             nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \

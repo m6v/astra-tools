@@ -92,8 +92,8 @@ scan(){
 results(){
     echo -n "Проверка результатов контроля целостности ..."
     # Получить сводку последней проверки целостности
-    last_res=$(grep -E 'Hash database' /var/log/syslog | tail -1)
-    if [ -z "$last_res" ]; then
+    last_check=$(grep -E 'Hash database' /var/log/syslog | tail -1)
+    if [ -z "$last_check" ]; then
         echo -e "${Red}ошибка!${NC}"
         echo "В системном логе /var/log/syslog результаты контроля целостности не найдены"
         echo "Выполните команду sudo systemctl restart afick и повторите проверку"
@@ -101,13 +101,12 @@ results(){
     fi
 
     # Дата и время последней проверки целостности
-    date=$(echo $last_res | cut -d' ' -f1-3)
+    date=$(echo $last_check | cut -d' ' -f1-3)
     # Найти в сводке значения, соответствующие шаблону item : value; привести их к виду item=value;
     # и выполнить присвоение соответствующим переменным их значений
-    for item in $(echo $last_res | grep -o '[a-z_]* : [0-9]*;' | sed 's/\s:\s/=/g')
-        do
-          eval $item
-        done
+    for item in $(echo $last_check | grep -o '[a-z_]* : [0-9]*;' | sed 's/\s:\s/=/g'); do
+        eval $item
+    done
     if [ $(($new+$delete+$changed)) -ne 0 ]; then
         echo -e "${Red}ошибка!${NC}"
         # Преобразовать дату из формата 'Nov 18 10:19:40' в '2024-11-18 10:19:40'
@@ -117,7 +116,7 @@ results(){
     fi
 }
 
-while [[ "$#" -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
     case $1 in
         -s|--scan)
             scan
@@ -149,16 +148,15 @@ done
 total=0  # Общее число проверок
 failed=0 # Число неуспешных проверок
 
-for check in $all_checks
-    do
-        ((total++))
-        $check
-        if [ $? -eq 0 ]; then
-            echo -e "${Green}успешно!${NC}"
-        else
-            ((failed++))
-        fi
-    done
-echo "Выполнено проверок ${total}, неуспешных ${failed}"
+for check in $all_checks; do
+    ((total++))
+    $check
+    if [ $? -eq 0 ]; then
+        echo -e "${Green}успешно!${NC}"
+    else
+        ((failed++))
+    fi
+done
 
+echo "Выполнено проверок ${total}, неуспешных ${failed}"
 exit $failed
