@@ -94,7 +94,7 @@ while read -r line; do
     ((checks++))
     fname=$(getfname $line)
     if [ ! -e "${fname}" ]; then
-        echo -e "${fname} ...нет такого файла или каталога"
+        echo -e "${fname} ...${red}нет такого файла или каталога${nc}${el}"
         continue
     fi
     # Получить прав доступа очередного объекта

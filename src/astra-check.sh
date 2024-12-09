@@ -9,9 +9,9 @@ VERSION=1.07
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
 # Используемые escape-последовательности
-NC='\033[0m' # Нет цвета
-Red='\033[0;31m' # Красный
-Green='\033[0;32m' # Зеленый
+nc='\033[0m' # Нет цвета
+red='\033[0;31m' # Красный
+green='\033[0;32m' # Зеленый
 
 all_checks="audit_parms swapwiper_control secdel_control mac_control \
             nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
@@ -32,19 +32,19 @@ usage(){
 audit_parms(){
     echo -n "Проверка настроек аудита событий ..."
     if [ -z "$(useraud -o)" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Аудит событий не включен" >&2
         return 1
     else
         sucess_events=($(useraud -on | cut -d: -f1))
         fail_events=($(useraud -on | cut -d: -f2))
         if [ $(($sucess_events & $((audflags)))) != $((audflags)) ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Настройки аудита событий не соответствуют эталону" >&2
             return 1
         fi
         if [ $(($fail_events & $((audflags)))) != $((audflags)) ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Настройки аудита событий не соответствует эталону" >&2
             return 1
         fi
@@ -62,14 +62,14 @@ swapwiper_control(){
         # Параметр q используется, чтобы ничего не писать в stdout, проверяется только код возврата
         grep -q ENABLED=Y $swapconf
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Очистка разделов страничного обмена не включена" >&2
             return 1
         fi
     else
         astra-swapwiper-control status 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Очистка разделов страничного обмена не включена" >&2
             return 1
         fi
@@ -77,7 +77,7 @@ swapwiper_control(){
 
     ignored_part=$(grep IGNORE= $swapconf | cut -d'"' -f2)
     if [ -n "$ignored_part" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Игнорируется раздел подкачки $ignored_part" >&2
         return 1
     fi
@@ -91,7 +91,7 @@ secdel_control(){
     else
         astra-secdel-control status 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Очистка освобождаемых блоков файловой системы не включена" >&2
             return 1
         fi
@@ -102,7 +102,7 @@ secdel_control(){
         if [ $? -eq 0 ]; then
             secdelrnd=$(echo $line | grep -oE "secdelrnd=[0-9]")
             if [ -z "$secdelrnd" ]; then
-                echo -e "${Red}ошибка!${NC}"
+                echo -e "${red}ошибка!${nc}"
                 echo "Очистка освобождаемых блоков не включена на разделе $(echo $line | cut -d' ' -f1)" >&2
                 return 1
             fi
@@ -116,21 +116,21 @@ mac_control(){
     max_ilev=$(grep -Po 'parsec.max_ilev=\d*' /proc/cmdline | cut -d= -f2)
     if [ $ASTRA_RELEASE == "1.6" ]; then
         if [ -z "$max_ilev" ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Режим МРД не включен" >&2
             return 1
         fi
     else
         astra-mac-control is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Режим МРД не включен!" >&2
             return 1
         fi
     fi
 
     if [ $max_ilev -eq 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Максимально допустимый уровень целостности имеет нулевое значение" >&2
         return 1
     fi
@@ -141,14 +141,14 @@ nochmodx_lock(){
     echo -n "Проверка блокировки установки бита исполнения ..."
     if [ $ASTRA_RELEASE == "1.6" ]; then
         if [ $(cat /parsecfs/nochmodx) -eq 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка установки бита исполнения не включена" >&2
             return 1
         fi
     else
         astra-nochmodx-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка установки бита исполнения не включена" >&2
             return 1
         fi
@@ -165,14 +165,14 @@ interpreters_lock(){
         # то в зависимости от текущей установки возвращается enabled или disabled
         result=$(systemctl is-enabled astra-interpreters-lock 2> /dev/null)
         if [ "$result" != "enabled" ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка интерпретаторов не включена" >&2
             return 1
         fi
     else
         astra-interpreters-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка интерпретаторов не включена" >&2
             return 1
         fi
@@ -185,14 +185,14 @@ macros_lock(){
     if [ $ASTRA_RELEASE == "1.6" ]; then
         result=$(systemctl is-enabled astra-macros-lock 2> /dev/null)
         if [ "$result" != "enabled" ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка макросов не включена" >&2
             return 1
         fi
     else
         astra-macros-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка макросов не включена" >&2
             return 1
         fi
@@ -209,14 +209,14 @@ ptrace_lock(){
     if [ $ASTRA_RELEASE == "1.6" ]; then
         result=$(systemctl is-enabled astra-ptrace-lock 2> /dev/null)
         if [ "$result" != "enabled" ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка трассировки ptrace не включена" >&2
             return 1
         fi
     else
         astra-ptrace-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка трассировки ptrace не включена" >&2
             return 1
         fi
@@ -232,14 +232,14 @@ sysrq_lock(){
     echo -n "Проверка блокировки клавиш SysRq ..."
     if [ $ASTRA_RELEASE == "1.6" ]; then
         if [ $(cat /proc/sys/kernel/sysrq) -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка клавиш SysRq не включена" >&2
             return 1
         fi
     else
         astra-sysrq-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка клавиш SysRq не включена" >&2
             return 1
         fi
@@ -255,14 +255,14 @@ shutdown_lock(){
         # В Astra Linux 1.6 astra-shutdown-lock не возвращает текущий статус, только включение или выключение, поэтому парсим вручую
         allow_shutdown=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('/etc/X11/fly-dm/fly-dmrc'); print(c['X-*-Core']['AllowShutdown'])")
         if [ $allow_shutdown == "All" ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка отключения питания не включена" >&2
             return 1
         fi
     else
         astra-shutdown-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
-            echo -e "${Red}ошибка!${NC}"
+            echo -e "${red}ошибка!${nc}"
             echo "Блокировка отключения питания не включена" >&2
             return 1
         fi
@@ -328,7 +328,7 @@ passwords_policy(){
     # Выводим сообщение в конце теста, т.к. в процессе его выполнения могут выводиться предупреждающие сообщения
     echo -n "Проверка политики паролей ..."
     if [ $result -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
     fi
     return $result
 }
@@ -370,7 +370,7 @@ blocking_policy(){
     # Выводим сообщение в конце теста, т.к. в процессе его выполнения могут выводиться предупреждающие сообщения
     echo -n "Проверка политики блокировки учетных записей ..."
     if [ $result -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
     fi
     return $result
 }
@@ -393,7 +393,7 @@ logrotate_parms(){
     fi
 
     if [ $result -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Параметры периодичности ротации журналов регистрации событий настроены неверно" >&2
         echo "Проверьте файл /etc/logrotate.conf" >&2
     fi
@@ -406,7 +406,7 @@ parsec_tests(){
     '
     echo -n "Проверка установки средств тестирования подсистемы безопасности PARSEC ..."
     if [ -z "$(dpkg -l | grep parsec-tests)" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Средства тестирования подсистемы безопасности PARSEC не установлены" >&2
         return 1
     fi
@@ -447,7 +447,7 @@ check_users(){
     # В дополнение к оболочке /bin/bash проверяем /bin/sh, т.к. в некоторых случаях может быть установлена она
     diff=$(getent passwd | sort | awk -F: '{if (match($NF, "/bin/(ba)?sh")) { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst)
     if [ $? -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Настройки учетных записей пользователей не соответствуют эталонным" 
         getent passwd | sort | awk -F: '{if ($NF=="/bin/bash") { system("groups " $1); system("pdpl-user " $1)}}' | diff -y - users.lst
         return 1
@@ -546,7 +546,7 @@ for check in $selected_checks
         ((total++))
         $check
         if [ $? -eq 0 ]; then
-            echo -e "${Green}успешно!${NC}"
+            echo -e "${green}успешно!${nc}"
         else
             ((failed++))
         fi
