@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION=1.07
-ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
+VERSION=1.02
 
 # Используемые escape-последовательности
 nc='\033[0m' # Нет цвета
@@ -10,83 +9,78 @@ green='\033[0;32m' # Зеленый
 
 all_checks="running_components virus_detection"
 
-show_help=false
+usage(){
+    echo "Использование: $(basename $0) [-l|-h|-v] [ПРОВЕРКА]..."
+    echo "Проверяет настройки САВЗ Dr.Web"
+    echo
+    echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
+    echo "  -l, --list    показать список проверок и выйти"
+    echo "  -h, --help    показать эту справку и выйти"
+    echo "  -v, --version показать информацию о версии и выйти"
+    echo "Если ПРОВЕРКА не задана, выполняются все проверки"
+}
 
 running_components(){
-  : '
-    Функция проверяет список запущенных компонентов САВЗ Dr.Web и выполняет попытку создания тестового вируса eicar.
-    Если компоненты ConfigD, ScanEngine, FileCheck и LinuxSpider запущены,
-    тестовый вирус eicar обнаружен и помещен в карантин, проверка считается успешной
-  '
-  echo -n "Проверка работоспособности САВЗ Dr.Web..."
-  if [ $(drweb-ctl appinfo | awk '{print $1 $3}' | grep -c -E "ConfigD;RUNNING|ScanEngine;RUNNING|FileCheck;RUNNING|LinuxSpider;RUNNING") -ne 4 ]; then
-    echo -e "${red}ошибка!${nc}"; echo "Запущены не все компоненты САВЗ Dr.Web"
-    return 1
-  fi
+    echo -n "Проверка запущенных компонентов САВЗ Dr.Web..."
+    if [ $(drweb-ctl appinfo | awk '{print $1 $3}' | grep -c -E "ConfigD;RUNNING|ScanEngine;RUNNING|FileCheck;RUNNING|LinuxSpider;RUNNING") -ne 4 ]; then
+        echo -e "${red}ошибка!${nc}"
+        echo "Запущены не все компоненты САВЗ Dr.Web" >&2
+        return 1
+    fi
 }
 
 virus_detection(){
-  echo -n "Проверка обнаружения тестового вируса eicar..."
-  drweb-ctl quarantine --Delete All 1> /dev/null
-  grep X5O /opt/drweb.com/share/doc/drweb-se/readme.eicar > /tmp/eicar
+    echo -n "Проверка обнаружения тестового вируса eicar..."
+    drweb-ctl quarantine --Delete All 1> /dev/null
+    grep X5O /opt/drweb.com/share/doc/drweb-se/readme.eicar > /tmp/eicar
 
-  # На всякий случай ждем 5 сек для обнаружения тестового вируса и помещения его в карантин
-  sleep 5
-  if [ -z "$(drweb-ctl quarantine)" ]; then
-    echo -e "${red}ошибка!${nc}"; echo "Тестовый вирус eicar не обнаружен"
-    return 1
-  fi
+    # Ждем 5 сек для обнаружения тестового вируса и помещения его в карантин
+    sleep 5
+    if [ -z "$(drweb-ctl quarantine)" ]; then
+        echo -e "${red}ошибка!${nc}"
+        echo "Тестовый вирус eicar не обнаружен" >&2
+        return 1
+    fi
 }
 
 while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    -l|--list)
-      echo $all_checks
-      exit
-      ;;
-    -h|--help)
-      show_help=true
-      ;;
-    -v|--version)
-      echo echo $(basename $0) $VERSION
-      exit
-      ;;
-    *)
-      # Проверка, что перед $1 идет начало строки или пробел, а после - пробел или конец строки
-      # Необходимо, чтобы агрумент в точности совпадал с именем проверки, а не являлся подстрокой
-      if [ -n "$(echo $all_checks | grep -E "(^| )$1( |$)")" ]; then
-          selected_checks="$selected_checks $1"
-        else
-          echo "Неизвестный параметр или проверка $1"
-          exit
-      fi
-      ;;
-  esac
-  shift
+    case $1 in
+        -l|--list)
+            echo $all_checks
+            exit
+            ;;
+        -h|--help)
+            usage
+            exit
+            ;;
+        -v|--version)
+            echo $(basename $0) $VERSION
+            exit
+            ;;
+        *)
+            # Проверка, что перед $1 идет начало строки или пробел, а после - пробел или конец строки
+            # Необходимо, чтобы агрумент в точности совпадал с именем проверки, а не являлся подстрокой
+            if [ -n "$(echo $all_checks | grep -E "(^| )$1( |$)")" ]; then
+                selected_checks="$selected_checks $1"
+            else
+                echo "Неизвестный параметр или проверка $1"
+                exit
+            fi
+            ;;
+    esac
+    shift
 done
 
 if [ -z "$selected_checks" ]; then
-  selected_checks=$all_checks
-fi
-
-if $show_help; then
-  echo "Использование: drweb-check [-l|-h|-v] [ПРОВЕРКА]..."
-  echo "Проверяет настройки САВЗ Dr.Web"
-  echo
-  echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
-  echo "  -l, --list    показать список проверок и выйти"
-  echo "  -h, --help    показать эту справку и выйти"
-  echo "  -v, --version показать информацию о версии и выйти"
-  echo "Если ПРОВЕРКА не задана, выполняются все проверки"
-  exit
+    selected_checks=$all_checks
 fi
 
 for check in $selected_checks
-  do
-    $check
-    if [ $? -eq 0 ]; then
-      echo -e "${green}успешно!${nc}"
-    fi
-  done
+    do
+        $check
+        if [ $? -eq 0 ]; then
+            echo -e "${green}успешно!${nc}"
+        fi
+    done
 
 exit

@@ -8,9 +8,9 @@ fi
 VERSION=1.08
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
-NC='\033[0m' # No Color
-Red='\033[0;31m' # Red
-Green='\033[0;32m' # Green
+nc='\033[0m' # Нет цвета
+red='\033[0;31m' # Красный
+green='\033[0;32m' # Зеленый
 
 all_checks="status results"
 
@@ -33,7 +33,7 @@ settings(){
         return 0
     fi
 
-    echo -e "${Red}ошибка!${NC}"
+    echo -e "${red}ошибка!${nc}"
     if [ -n "$verbose" ]; then
         echo "Настройки средства регламентного контроля целостности не соответствуют эталонным" >&2
         echo "Сравните файл /etc/afick.conf с эталонным, устраните несоответствия и повторите проверку" >&2
@@ -50,7 +50,7 @@ status(){
     echo -n "Проверка состояния службы регламентного контроля целостности ..."
     result=$(systemctl is-enabled afick 2> /dev/null)
     if [ "$result" != "enabled" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Служба регламентного контроля целостности не включена" >&2
         if [ ! -f "/etc/systemd/system/afick.service"]; then
             echo "Файл /etc/systemd/system/afick.service отсутствует" >&2
@@ -66,7 +66,7 @@ status(){
     fi
 
     if [ -z "$(systemctl status afick | grep status=0/SUCCESS)" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "Последний запуск средства регламентного контроля целостности Afick завершен с ошибкой" >&2
         echo "Выполните команду systemctl status afick и проанализируйте логи" >&2
         return 1
@@ -79,11 +79,11 @@ scan(){
     result=$?
 
     if [ $result -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         # Пропустить в отчете строки с комментариями
         grep -v '^#' /tmp/afick.res
     else
-        echo "${Green}успешно!${NC}"
+        echo "${green}успешно!${nc}"
     fi
 
     exit $result
@@ -94,7 +94,7 @@ results(){
     # Получить сводку последней проверки целостности
     last_check=$(grep -E 'Hash database' /var/log/syslog | tail -1)
     if [ -z "$last_check" ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         echo "В системном логе /var/log/syslog результаты контроля целостности не найдены"
         echo "Выполните команду sudo systemctl restart afick и повторите проверку"
         return 1
@@ -108,7 +108,7 @@ results(){
         eval $item
     done
     if [ $(($new+$delete+$changed)) -ne 0 ]; then
-        echo -e "${Red}ошибка!${NC}"
+        echo -e "${red}ошибка!${nc}"
         # Преобразовать дату из формата 'Nov 18 10:19:40' в '2024-11-18 10:19:40'
         echo "Последняя проверка: " $(date -d"$date" "+%F %T")
         echo "Новых: $new, удаленных: $delete, измененных: $changed"
@@ -152,7 +152,7 @@ for check in $all_checks; do
     ((total++))
     $check
     if [ $? -eq 0 ]; then
-        echo -e "${Green}успешно!${NC}"
+        echo -e "${green}успешно!${nc}"
     else
         ((failed++))
     fi
