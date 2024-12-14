@@ -5,7 +5,7 @@ if [ $(id -u) -ne 0 ]; then
     exit
 fi
 
-VERSION=1.08
+VERSION=1.11
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
 nc='\033[0m' # Нет цвета
@@ -26,20 +26,40 @@ usage(){
     echo "      --version показать информацию о версии и выйти"
 }
 
-settings(){
-    echo -n "Проверка настроек средства регламентного контроля целостности ..."
-    diff $fname /etc/afick.conf > /tmp/afick.diff
-    if [ $? -eq 0 ]; then
-        return 0
+paths(){
+    result=0
+    for i in $paths; do
+        # В файле afick.conf после пути к проверяемому объекту идет пробел или табуляция
+        grep -Po "^$i[^ \t]*" afick.conf &> /dev/null
+        if [ $? -ne 0 ]; then 
+            echo "Целостность объекта $i не контролируется" >&2
+            ((result++))
+        fi 
+    done
+
+    echo -n "Проверка списка объектов, целостность которых подлежит контролю ..."
+    if [ $result -ne 0 ]; then
+        echo -e "${red}ошибка!${nc}"
     fi
 
-    echo -e "${red}ошибка!${nc}"
-    if [ -n "$verbose" ]; then
-        echo "Настройки средства регламентного контроля целостности не соответствуют эталонным" >&2
-        echo "Сравните файл /etc/afick.conf с эталонным, устраните несоответствия и повторите проверку" >&2
-        cat /tmp/afick.diff
-    fi
-    return 1
+    return $result
+}
+
+status_new(){
+    # TODO Сделать полноценный анализ кода возврата службы afick
+    # afick -k возвращает четырехбитное значение в котором установка бита 0 означает наличие "битых" ссылок,
+    # бита 1 - наличие измененных убъектов, бита 2 - удаленных объектов, бита 3 - новых объектов
+    
+    result=$(systemctl status afick)
+    case $result in
+        0)
+            return $result
+            ;;
+        4)
+            echo "Служба регламентного контроля целостности не обнаружена" >&2
+            ;;
+    esac
+    return $result
 }
 
 status(){
@@ -51,12 +71,13 @@ status(){
     result=$(systemctl is-enabled afick 2> /dev/null)
     if [ "$result" != "enabled" ]; then
         echo -e "${red}ошибка!${nc}"
-        echo "Служба регламентного контроля целостности не включена" >&2
-        if [ ! -f "/etc/systemd/system/afick.service"]; then
+        if [ -f "/etc/systemd/system/afick.service" ]; then
+            echo "Служба регламентного контроля целостности не включена" >&2
+            echo "Выполните команду systemctl enable afick и повторите проверку" >&2
+        else
+            echo "Служба регламентного контроля целостности не обнаружена" >&2
             echo "Файл /etc/systemd/system/afick.service отсутствует" >&2
-            return 1
         fi
-        echo "Выполните команду systemctl enable afick и повторите проверку" >&2
         return 1
     fi
 
@@ -65,6 +86,7 @@ status(){
         systemctl status --no-pager -l afick
     fi
 
+    # TODO Переделать на анализ кода возврата: 0 - Ок, 4 - служба не найдена и т.п.
     if [ -z "$(systemctl status afick | grep status=0/SUCCESS)" ]; then
         echo -e "${red}ошибка!${nc}"
         echo "Последний запуск средства регламентного контроля целостности Afick завершен с ошибкой" >&2
@@ -90,6 +112,7 @@ scan(){
 }
 
 results(){
+    # NB! Уточнить необходимость проверки, т.к. результаты уже есть в коде возврата afick.service
     echo -n "Проверка результатов контроля целостности ..."
     # Получить сводку последней проверки целостности
     last_check=$(grep -E 'Hash database' /var/log/syslog | tail -1)
@@ -135,15 +158,25 @@ while [ "$#" -gt 0 ]; do
         *)
             fname=$1
             if [ ! -f $fname ]; then
-                echo "$(basename $0):" $fname "нет такого файла"
+                "$(basename $0): задан неправильный параметр или путь: $1"
                 exit
             fi
-            # Если файл с эталонными настройками задан, добавляем проверку сравнения с ним
-            all_checks+=" settings"
+            paths+=" $(cat $fname | tr '\n' ' ')"
             ;;
     esac
     shift
 done
+
+# Если в стандартном вводе есть данные, считаем их путями к объектам, целостность которых подлежит контролю
+if read -t 0 _ ; then
+    while IFS= read -r line; do
+        paths+=" $line"
+    done < /dev/stdin
+fi
+
+if [ -n "$paths" ]; then
+    all_checks+=" paths"
+fi
 
 total=0  # Общее число проверок
 failed=0 # Число неуспешных проверок
