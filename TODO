@@ -1,5 +1,26 @@
 При выводе прав пользователей добавить вывод спец. привилегий PARSEC
 
+Проверить конструкцию $(($new+$delete+$changed)) в afick-check
+
+Разобраться с директивой логирования afick report_syslog. Видимо systemd пишет в сислог вне зависимости от ее значения.
+
+NB! Необходимо учесть, что код возврата systemctl status unit_name это не код возврата запущенной службы, который выводится на экран (https://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html)
+
+If the status action is requested, the init script will return the following exit status codes.
+
+0	program is running or service is OK
+1	program is dead and /var/run pid file exists
+2	program is dead and /var/lock lock file exists
+3	program is not running
+4	program or service status is unknown
+5-99	reserved for future LSB use
+100-149	reserved for distribution use
+150-199	reserved for application use
+200-254	reserved
+
+Поэтому systemctl status afick возвращает код 3, а на экран выводит 0/SUCCESS. Можно попробовать добавить RemainAfterExit=yes в юнит, чтобы результаты работы процесса остался в статусе юнита.
+
+
 Сделать скрипты getsums.sh и chksums.sh аналогичные скриптам проверки прав доступа, но создающие и проверяющие контрольные суммы указанных объектов
 (если объект является каталогом пройтись по нему рекурсивно, предусмотреть опцию для формирования КС только для исполняемых файлов
 

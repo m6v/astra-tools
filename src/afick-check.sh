@@ -27,9 +27,10 @@ config(){
 
     # Считать значения директив из конфигурационного файла
     while read line; do
+        echo $line
         declare $line
     # Значения директивам присваиваются с помощью оператора := который может отделяться необязательными пробелами
-    done < <(grep -Po '^[a-zA-Z_]+\s*:=\s*[a-zA-Z/]+' $CONFIG_FILE | tr -d ': ')
+    done < <(grep -Po '^\w+\s*:=\s*[a-zA-Z/]+' $CONFIG_FILE | tr -d ': ')
 
     if [ "$report_syslog" != "yes" ]; then
         echo -e "${red}ошибка!${nc}"
