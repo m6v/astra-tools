@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-if [ $(id -u) -ne 0 ]; then
-    echo "$(basename $0): запустите программу с правами суперпользователя"
-    exit
-fi
+# Однострочная замена скрипта
+# find dir_name \! -type l -exec ls -dal --time-style=+ {} \; | cut -d' ' -f1,3,4,7-
+# find dir_name \! -type l -exec pdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,4-
 
 VERSION=1.04
 
@@ -28,7 +27,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         *)
             if [ ! -d $1 ]; then
-                echo "Ошибка: каталог $1 не существует" >&2
+                echo "$(basename $0): каталог $1 не существует" >&2
                 exit
             fi
             dirs+=" $1"
@@ -41,8 +40,14 @@ if [ -z "$dirs" ]; then
     dirs="/"
 fi
 
+if [ $(id -u) -ne 0 ]; then
+    echo "$(basename $0): запустите программу с правами суперпользователя"
+    exit
+fi
+
 # Присвоить переменной ID идентификатор дистрибутива
 eval $(grep ^ID= /etc/os-release)
+
 # Сформировать шаблон команды чтения атрибутов объектов доступа
 if [ "$ID" == "astra" ]; then
     cmd="find %s \! -type l -exec pdp-ls -daM --time-style=+ {} \; | cut -d' ' -f1,4-"

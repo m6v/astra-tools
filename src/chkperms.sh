@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-if [ $(id -u) -ne 0 ]; then
-    echo "$(basename $0): запустите программу с правами суперпользователя"
-    exit
-fi
-
 VERSION=1.13
 
 # Используемые escape-последовательности
@@ -12,9 +7,6 @@ el='\033[K' # Стереть от курсора до конца строки
 nc='\033[0m' # Нет цвета
 red='\033[0;31m' # Красный
 green='\033[0;32m' # Зеленый
-
-checks=0
-errors=0
 
 usage(){
     echo "Использование: $(basename $0) [-h|-v|-p|--version] ФАЙЛ..."
@@ -64,7 +56,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 if [ ! -f "$file" ]; then
-    echo "Ошибка: файл с матрицей доступа не задан или не найден" >&2
+    echo "$(basename $0): файл с матрицей доступа не задан или не найден" >&2
     exit
 fi
 
@@ -89,13 +81,21 @@ else
     getperms(){ eval "ls -dl --time-style=+ '$@' | cut -d' ' -f1,3,4,7-";}
 fi
 
+if [ $(id -u) -ne 0 ]; then
+    echo "$(basename $0): запустите программу с правами суперпользователя"
+    exit
+fi
+
+checks=0
+errors=0
+
 echo "Проверка прав доступа..."
 while read -r line; do
     $show_progress $checks
     ((checks++))
     fname=$(getfname $line)
     if [ ! -e "${fname}" ]; then
-        echo -e "${fname} ...${red}нет такого файла или каталога${nc}${el}"
+        echo -e "${fname} ...нет такого файла или каталога${el}"
         continue
     fi
     # Получить прав доступа очередного объекта

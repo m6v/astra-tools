@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-VERSION=1.11
+VERSION=1.13
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
-CONFIG_FILE='./afick.conf'
+CONFIG_FILE='/etc/afick.conf'
 
 nc='\033[0m' # Нет цвета
 red='\033[0;31m' # Красный
@@ -27,10 +27,9 @@ config(){
 
     # Считать значения директив из конфигурационного файла
     while read line; do
-        echo $line
         declare $line
     # Значения директивам присваиваются с помощью оператора := который может отделяться необязательными пробелами
-    done < <(grep -Po '^\w+\s*:=\s*[a-zA-Z/]+' $CONFIG_FILE | tr -d ': ')
+    done < <(grep -Po '^[a-zA-Z_]+\s*:=\s*[a-zA-Z/]+' $CONFIG_FILE | tr -d ': ')
 
     if [ "$report_syslog" != "yes" ]; then
         echo -e "${red}ошибка!${nc}"
@@ -41,17 +40,18 @@ config(){
 }
 
 paths(){
+    # NB! Учесть, что в /etc/afick.conf могут быть символы подстановки
     result=0
-    for i in $paths; do
-        if [ ! -e $i ]; then
-            echo "$i не существует"
+    for path in $paths; do
+        if [ ! -e $path ]; then
+            echo "$path не существует"
         fi
         # В файле afick.conf после пути к проверяемому объекту идет пробел или табуляция
-        grep -Po "^$i[^ \t]*" afick.conf &> /dev/null
-        if [ $? -ne 0 ]; then 
-            echo "Целостность $i не контролируется" >&2
+        grep -Po "^$path[^ \t]*" afick.conf &> /dev/null
+        if [ $? -ne 0 ]; then
+            echo "Целостность $path не контролируется" >&2
             ((result++))
-        fi 
+        fi
     done
 
     echo -n "Проверка списка объектов, целостность которых подлежит контролю ..."
@@ -71,26 +71,25 @@ status(){
       "битых" ссылок (бит 0), измененных объектов (бит 1), удаленных объектов (бит 2), новых объектов (бит 3)
     '
     echo -n "Проверка состояния службы регламентного контроля целостности ..."
-    systemctl status afick &>/dev/null
-    result=$?
-    case $result in
-        0)
-            return $result
-            ;;
-        4)
-            echo -e "${red}ошибка!${nc}"
-            echo "Служба регламентного контроля целостности не обнаружена" >&2
-            ;;
-        *)
-            echo -e "${red}ошибка!${nc}"
-            echo "Служба регламентного контроля целостности завершилась с ошибкой (Exit code=$result)" >&2
-            if [ -n "$verbose" ]; then
-                echo
-                systemctl status --no-pager -l afick
-            fi            
-            ;;
-    esac
-    return $result
+    # Проверка кода возврата, значения кодов в спецификации Linux Standard Base Core Specification, Generic Part
+    # https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic.html#INISCRPTACT
+    systemctl status afick &> /dev/null
+    if [ $? -eq 4 ]; then
+        # Program or service status is unknown. No such unit
+        echo -e "${red}ошибка!${nc}"
+        echo "Служба регламентного контроля целостности не обнаружена" >&2
+        return 1
+    fi
+
+    # Т.к. systemctl status afick, возвращает не статус службы выводимый на экране,
+    # парсим вывод и получаем из него статус (status) службы afick
+    declare $(systemctl status afick | grep -Po "status=\d+" -m 1)
+    if [ $status -ne 0 ]; then
+        echo -e "${red}ошибка!${nc}"
+        echo "Служба регламентного контроля целостности завершилась с ошибкой (Exit code=$status)" >&2
+        return $status
+    fi
+    return 0
 }
 
 status_bak(){

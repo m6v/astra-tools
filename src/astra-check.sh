@@ -244,25 +244,25 @@ sysrq_lock(){
 
 shutdown_lock(){
     echo -n "Проверка блокировки отключения питания ..."
-    if [ $ASTRA_RELEASE == "1.6" ]; then
-        # Параметр AllowShutdown в секциях [X-:*-Core] и [X-*-Core] (разрешение локального и удаленного выключения питания соответственно)
-        # файла /etc/X11/fly-dm/fly-dmcc может принимать значения All, Root или None ("Всем", "Только администратору" или "Никому")
-        # В Astra Linux 1.6 astra-shutdown-lock не возвращает текущий статус, только включение или выключение, поэтому парсим вручую
-        allow_shutdown=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('/etc/X11/fly-dm/fly-dmrc'); print(c['X-*-Core']['AllowShutdown'])")
-        if [ $allow_shutdown == "All" ]; then
-            echo -e "${red}ошибка!${nc}"
-            # echo "Блокировка отключения питания не включена" >&2
-            return 1
-        fi
-    # TODO Возможно блокировку питания придется отключить, иначе возникают проблемы (уточнить в чем именно)!
-    else
+    # Параметр AllowShutdown в секциях [X-:*-Core] и [X-*-Core] (разрешение локального и удаленного выключения питания соответственно)
+    # файла /etc/X11/fly-dm/fly-dmcc может принимать значения All, Root или None ("Всем", "Только администратору" или "Никому")
+    # В Astra Linux 1.6 astra-shutdown-lock не возвращает текущий статус, только включение или выключение, поэтому парсим вручую
+    allow_shutdown=$(python3 -c "import configparser; c = configparser.ConfigParser(); c.read('/etc/X11/fly-dm/fly-dmrc'); print(c['X-*-Core']['AllowShutdown'])")
+    if [ $allow_shutdown == "All" ]; then
+        echo -e "${red}ошибка!${nc}"
+        # echo "Блокировка отключения питания не включена" >&2
+        return 1
+    fi
+    : ' # Т.к. блокировка локального отключения питания не нужна пропускаем дальнейшую проверку
+        # В Astra Linux 1.6 astra-shutdown-lock is-enable не предусмотрена
+    if [ $ASTRA_RELEASE == "1.7" ]; then
         astra-shutdown-lock is-enabled 1> /dev/null
         if [ $? -ne 0 ]; then
             echo -e "${red}ошибка!${nc}"
             # echo "Блокировка отключения питания не включена" >&2
             return 1
         fi
-    fi
+    '
     return 0
 }
 
@@ -347,7 +347,7 @@ blocking_policy(){
         echo "Число неуспешных попыток аутентификации и/или период блокировки не заданы" >&2
         result=1
     else
-        if [ $deny -gt 3 ]; then
+        if [ $deny -gt 6 ]; then
             echo "Число неуспешных попыток аутентификации до блокирования учетной записи задано неверно" >&2
             ((result++))
         fi
