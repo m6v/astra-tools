@@ -1,10 +1,8 @@
 При выводе прав пользователей добавить вывод спец. привилегий PARSEC
 
-Проверить конструкцию $(($new+$delete+$changed)) в afick-check
+В скрипте postinst.sh определить запущен он при установке ОС или пользователем. В первом случае перенаправить stdout и stderr в файл.
 
 Разобраться с директивой логирования afick report_syslog. Видимо systemd пишет в сислог вне зависимости от ее значения.
-
-NB! Необходимо учесть, что код возврата systemctl status unit_name это не код возврата запущенной службы, который выводится на экран (https://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/iniscrptact.html)
 
 If the status action is requested, the init script will return the following exit status codes.
 
@@ -18,8 +16,14 @@ If the status action is requested, the init script will return the following e
 150-199	reserved for application use
 200-254	reserved
 
-Поэтому systemctl status afick возвращает код 3, а на экран выводит 0/SUCCESS. Можно попробовать добавить RemainAfterExit=yes в юнит, чтобы результаты работы процесса остался в статусе юнита.
-
+Поэтому systemctl status afick возвращает код 3, а на экран выводит 0/SUCCESS.
+ 
+NB!
+Systemd может обслуживать процессы с разным поведением:
+Type=Simple – самый стандартный тип (о умолчанию). Процесс остается в foreground, stdout перехватывается systemd.
+Type=Forking – прямая противоположность. Процесс должен форкнуться и отсоединится от foreground. Для этого типа юнитов должен быть указан pid через директиву PIDFile.
+Type=oneshot – процесс, который успешно выполняется (не делая fork) и завершается. Пример – монтирование файловых систем. Рекомендуется добавить RemainAfterExit=yes в юнит, чтобы результаты работы процесса остался в статусе юнита.
+Type=notify – аналог simple, но в этом случае сам процесс сообщит systemd о том, что он закончил загрузку и готов к работе.
 
 Сделать скрипты getsums.sh и chksums.sh аналогичные скриптам проверки прав доступа, но создающие и проверяющие контрольные суммы указанных объектов
 (если объект является каталогом пройтись по нему рекурсивно, предусмотреть опцию для формирования КС только для исполняемых файлов

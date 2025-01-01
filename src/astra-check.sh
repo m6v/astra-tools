@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION=1.10
+VERSION=1.11
 ASTRA_RELEASE=$(lsb_release -rs | cut -b 1-3)
 
 # Используемые escape-последовательности
