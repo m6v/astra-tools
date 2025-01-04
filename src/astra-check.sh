@@ -334,6 +334,7 @@ blocking_policy(){
       Функция проверяет значения параметров deny и unlock_time в файле /etc/pam.d/common-account
       Если параметр deny меньше или равен 3, а unlock_time больше или равен 1800, то проверка считается успешной
     '
+    # NB! В Астре 1.7.4 файл /etc/pam.d/common-auth
     # Распарсить файл на пары ключ=значение и создаем переменные с соответствующими именами и значениями
     result=0
     for line in $(grep pam_tally.so /etc/pam.d/common-account | awk '{for(i=1;i<=NF;i++) {if(match($i,/=/)) {print $i} } }'); do

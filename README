@@ -1,0 +1,27 @@
+В каталоге root создается дерево каталогов с файлами которые при постинсталяционной настройке копируются в целевую систему
+root
+├─ etc
+│  └─ systemd
+│     ├─ afick.conf
+│     └─ system
+│        └─ afick.service
+├─ root
+│  └─ afick-check
+├─ tmp
+│  └─ postinst.sh
+└─ usr
+   └─ local
+      └─ bin
+         └─ afick_parser
+
+afick.service юнит средства регламентного контроля целостности afick
+afick.conf конфигурационный файл syslog-ng для логирования результатов работы afick
+afick_parser парсер логов afick
+postinst.sh постинсталляционный скрипт
+
+Создание архива
+cd root
+tar -czvf ../postinst.tar.gz .
+
+3) на целевой системе выполнить разархивирование
+tar -xzvf postinst.tar.gz -C /

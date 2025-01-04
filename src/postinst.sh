@@ -24,13 +24,11 @@ if [ $(id -u) -ne 0 ]; then
 fi
 
 echo -n "Настройка гарантированного удаления файлов и папок..."
-# включить гарантированное удаление файлов и папок,
-# чтобы по умолчанию установился параметр secdel
+# включить гарантированное удаление файлов и папок, чтобы в ext разделах установился параметр secdel
 astra-secdel-control enable
 show_result $?
 # заменить параметр secdel... на secdelrnd=1
 sed -i 's/secdel[^ ]*/secdelrnd=1/g' /etc/fstab
-echo -e "${green}успешно!${nc}"
 
 echo -n "Настройка очистки разделов подкачки..."
 astra-swapwiper-control enable
@@ -73,18 +71,20 @@ echo -n "Настройка средства срегламентного кон
 sed -i 's/report_syslog := no/report_syslog := yes/' /etc/afick.conf
 
 # Создание юнита для запуска afick при загрузке ОС
+# В /var/log/syslog вывод пишет всегда независимо от параметра report_syslog,
+# возможно это особенность systemd. Сводка результатов пишется в /var/lib/afick/history
 cat << EOF > /etc/systemd/system/afick.service
 [Unit]
-Description=File integrity checker service
+Description=Another File Integrity Checker
 # After=network.target
-# Попробовать запуск после монтирования локальных файловых систем
+# Запуск после монтирования локальных файловых систем
 After=local-fs.target
 
 [Service]
 # При типе oneshot все последующие юниты будут ждать заверешения afick прежде чем запустятся,
 # при типе simple последующие юниты запускаются параллельно, не ожидая завершения afick
 Type=oneshot
-ExecStart=/bin/bash -c "afick -k; exit 0"
+ExecStart=/bin/bash -c "afick -k &>> /dev/null; exit 0"
 # Считать сервис активным, несмотря на то, что процесс завершился
 RemainAfterExit=true
 # StandardOutput=journal
@@ -98,9 +98,10 @@ systemctl enable afick
 show_result $?
 
 echo -n "Включение ssh-сервера..."
+# Задержка, чтобы сервис успел включиться. Возможно дело не в ней, но ранее
+# после первой перезагрузки ssh был отключен!?
 sleep 3
 systemctl enable ssh
-# NB! После первой перезагрузки ssh отключен, systemctl is-active ssh возвращает inactive?!
 show_result $?
 
 echo -n "Создание групп пользователей..."
@@ -114,13 +115,22 @@ show_result $result
 
 echo -n "Создание пользователей..."
 users='operator:operators nachsmen:nachsmens technic:technics'
+result=0
 for i in $users; do
     user_name=$(echo $i | cut -d':' -f1)
     group_name=$(echo $i | cut -d':' -f2)
     # Чтобы не выводить сообщения при попытке создать пользователя с существующем именем, перенаправляем stderr в /dev/null
     useradd -g $group_name -G $DEFAULT_GROUPS -s /bin/bash -m -p $(openssl passwd -1 $PASS) $user_name 2>/dev/null
+    ((result+=$?))
 done
-# NB! В нужные группы пользователи не добавились, вместо этого добавились в группу root!
+show_result $result
 
-# Стала появляться какая-то группа и пользователь weston-launch?!
+echo -n "Настройка политики блокировки учетных записей..."
+sed -i 's/pam_tally.so.*/pam_tally.so deny=6 unlock_time=1800/' /etc/pam.d/common-auth
+show_result $?
 
+echo -n "Настройка политики паролей..."
+# Сделать необходимые настройки
+show_result 0
+
+# TODO Добавить настройку регистрации событий
