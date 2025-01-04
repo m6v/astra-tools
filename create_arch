@@ -1,0 +1,8 @@
+#!/bin/env bash
+# Установка владельца root:root для всех файлов
+find root -type f -exec chown root:root {} \;
+# Установка бита исполнения для исполняемых файлов
+find root -type f -exec file {} \; | grep executable | cut -d':' -f1 | xargs chmod +x
+cd root
+tar -czvf ../postinst.tar.gz *
+
