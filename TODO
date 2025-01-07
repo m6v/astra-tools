@@ -14,3 +14,9 @@ NB!
 Обновлять индикатор прогресса не на каждой итерации, а когда изменяется процент выполнения
 Рассмотреть вариант с парсингом командной строки с использованием getopts
 см.: https://www.baeldung.com/linux/bash-parse-command-line-arguments
+
+
+Добавить в АРМ-АБИ установку почтового клиента, ejabberd, psi-plus, python-xmpp
+apt install thunderbird -y
+
+Добавить в АРМ-О установку psi-plus (опционально, если нужен для каких-то целей), python-xmpp

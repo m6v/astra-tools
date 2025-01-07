@@ -4,17 +4,22 @@ root
 │   ├── syslog-ng
 │   │   └── conf.d
 │   │       └── afick.conf
+│   │       └── auth.conf
 │   └── systemd
 │       └── system
 │           └── afick.service
+│           └── xmpp-sender.service
 ├── root
 │   └── afick-check
+│   └── astra-check
+│   └── chkperms.sh
+│   └── getperms.sh
 ├── tmp
 │   └── postinst.sh
 └── usr
     └── local
         └── bin
-            └── afick_parser
+            └── afick_notifier
 
 afick.service юнит средства регламентного контроля целостности afick
 afick.conf конфигурационный файл syslog-ng для логирования результатов работы afick
