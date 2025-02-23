@@ -425,6 +425,7 @@ show_groups(){
 show_users(){
     : '
       Функция выводит пользователей, имеющих право интерактивного входа в систему
+      TODO Выводить всех с 1000<=uid<60000
     '
     getent passwd | sort | awk -F: '{if (match($NF, "/bin/(ba)?sh")) { system("groups " $1); system("pdpl-user " $1)}}' 
     # Если есть команда ald-admin, то вывести доменных пользователей

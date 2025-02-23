@@ -141,6 +141,31 @@ echo -n "Настройка правил протоколирования для
 useraud -mno 0x1800f:0x1800f
 show_result $?
 
+echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы"
+result=0
+: '''
+Сделать файл hosts и скопировать его на все СВТ
+ssh-keygen
+ssh-copy-id username@remote_host # нужно в начале настроек сделать файл /etc/hosts и скопировать его на все СВТ, здесь просто сделать цикл по всем хостам
+чтобы избежать подтверждения копирования в большинстве рекомендаций используется sshpass, который есть в базовом репозитории Астры, нужно только установить!
+Пример:
+SERVERS="arm-o server"
+
+for SERVER in SERVERS; do
+    # Copy our key the first time to allow
+    sshpass -p $DEFAULT_PASS ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no $USER@$SERVER || result=1
+
+    # Непонятно, зачем удалять и заново отправлять открытые ключи
+    # Clean the .ssh folder
+    ssh $USER@$SERVER 'rm -rf .ssh'
+
+    # Add back our key, as we have remove the former authorized keys, along with the new one!
+    sshpass -p $DEFAULT_PASS ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no $USER@$SERVER || result=1
+done
+'''
+show_result $result
+
+
 # Для АРМ-АБИ переменной is_arm_abi присваивается значение true, для остальных АРМ и серверов любое другое значение
 # is_arm_abi=true
 
@@ -166,6 +191,9 @@ systemctl restart ejabberd
 
 # Установка клиента обмена сообщениями по протоколу xmpp и сопутствующих библиотек
 apt install psi-plus libsasl2-modules python-xmpp -y
+# Создание именованного канала (см. https://www.freedesktop.org/software/systemd/man/latest/tmpfiles.d.html),
+# который будет использоваться для передачи сообщенеий от парсеров клиенту отправки xmpp-sender
+echo 'p /tmp/syslog-mg.msg 0644 root root' > /etc/tmpfiles.d/syslog-ng.conf
 
 # Получить имя учетной записи (администратора безопасности информации), созданной при инсталляции ОС
 admin_name=$(id -n -u 1000)
@@ -178,3 +206,6 @@ Icon=psi-plus
 Exec=/usr/bin/psi-plus
 Hidden=false
 EOF
+
+# Не запрашивать собственную vcard при запуске psi-plus 
+sed -i 's/<query-own-vcard-on-login type="bool">true/<query-own-vcard-on-login type="bool">false/' /home/$admin_name/.config/psi+/profiles/default/options.xml
