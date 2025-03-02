@@ -24,7 +24,7 @@ usage(){
     echo "Аргументы, обязательные для длинных параметров, обязательны и для коротких"
     echo "  -h, --hostname имя хоста"
     echo "  -e, --events   список флагов аудита успехов и отказов, по умолчанию ocxuew"
-    echo "  -p, --passes   число проходов (0..9) при очистке освобождаемых блоков файловой системы, по умолчанию 1"
+    echo "  -p, --passes   число проходов при очистке освобождаемых блоков файловой системы, по умолчанию 1"
     echo "  -v, --version  показать информацию о версии и выйти"
     echo "  -?, --help     показать эту справку и выйти"
 }
@@ -45,11 +45,9 @@ fi
 # Параметры по умолчанию (соответствуют требованиям для класса защищеннсти 1Г)
 events=ocxuew
 passes=1
-
 # Имя учетной записи (администратора безопасности информации), созданной при инсталляции ОС
 admin_name=$(id -n -u 1000)
 
-# TODO Сделать проверки правильности указанных аргументов
 while [ "$#" -gt 0 ]; do
     case $1 in
         -h|--hostname)
@@ -73,8 +71,7 @@ while [ "$#" -gt 0 ]; do
             exit
             ;;
         *)
-            echo "$(basename $0): неизвестный параметр: $1"
-            usage
+            echo "$(basename $0): неверный ключ: $1"
             exit
             ;;
     esac
@@ -106,6 +103,9 @@ if [ -n "$hostname" ]; then
     show_result $?
 fi
 
+echo $hostname $events $passes
+exit
+
 echo -n "Настройка локального репозитория..."
 # закомментировать все незакомментированные ссылки на репозитории
 sed -i 's/^\([^#].*\)/# \1/g' /etc/apt/sources.list
@@ -115,11 +115,18 @@ apt update
 show_result $?
 
 echo -n "Настройка гарантированного удаления файлов и папок..."
-# включить гарантированное удаление файлов и папок, чтобы в ext разделах установился параметр secdel
-astra-secdel-control enable
-show_result $?
-# заменить параметр secdel... на secdelrnd=1
-sed -i 's/secdel[^ ]*/secdelrnd=1/g' /etc/fstab
+if [ $passes -ne 0 ]; then
+    # включить гарантированное удаление файлов и папок, чтобы в ext разделах  установился параметр secdel
+    astra-secdel-control enable
+    result=$?
+    # заменить параметр secdel... на secdelrnd=1
+    sed -i 's/secdel[^ ]*/secdelrnd=${passes}/g' /etc/fstab
+# Если переменная passes имеен нулевое значение, отключить гарантированное удаление файлов и папок
+else
+    astra-secdel-control disable
+    result=$?
+fi
+show_result $result
 
 echo -n "Настройка очистки разделов подкачки..."
 astra-swapwiper-control enable
