@@ -11,7 +11,7 @@ green='\033[0;32m' # Зеленый
 groups="operators nachsmens technics"
 # Список создаваемых учетных записей пользователей и их группы
 # учетная запись администратора безопасности создается при установке ОС
-users='operator:operators nachsmen:nachsmens technic:technics'
+users='operator:operators nachsmen:nachsmens techno:technics'
 # Дефолтный пароль для создаваемых пользователей
 DEFAULT_PASS='Aa123456'
 # Список дополнительных групп для создаваемых пользователей (возможно еще нужны pulse и pulse-access)
@@ -121,7 +121,7 @@ if [ $passes -ne 0 ]; then
     result=$?
     # заменить параметр secdel... на secdelrnd=1
     sed -i 's/secdel[^ ]*/secdelrnd=${passes}/g' /etc/fstab
-# Если переменная passes имеен нулевое значение, отключить гарантированное удаление файлов и папок
+# если переменная passes имеет нулевое значение, отключить гарантированное удаление файлов и папок
 else
     astra-secdel-control disable
     result=$?
@@ -165,14 +165,14 @@ sed -i 's/pam_tally.so.*/pam_tally.so deny=6 unlock_time=1800/' /etc/pam.d/commo
 show_result $?
 
 echo -n "Настройка политики паролей..."
-# Настройка сложности (длины и алфавита) паролей
+# настройка сложности (длины и алфавита) паролей
 sed -i 's/pam_cracklib.so.*/pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0/' /etc/pam.d/common-password
-# Настройка максимального количества дней между сменами пароля
+# настройка максимального количества дней между сменами пароля
 sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
 show_result 0
 
 echo -n "Настройка правил протоколирования для пользователей..."
-# Установка ключей регистрации, заданных в passes
+# установка ключей регистрации, заданных в passes
 useraud -mo $passes:$passes &>/dev/null
 show_result $?
 
@@ -234,7 +234,7 @@ echo -n "Генерация ssh-ключей администратора без
 mkdir /home/$(admin_name)/.ssh
 ssh-keygen -f /home/${admin_name}/.ssh/id_rsa -q -N ""
 result=$?
-# Рекурсивно поменять владельца у ~/.ssh т.к. при выполнении под sudo будут root:root
+# рекурсивно поменять владельца у ~/.ssh т.к. при выполнении под sudo будут root:root
 chown -R ${admin_name}:${admin_name} /home/${admin_name}/.ssh
 show_result $result
 
@@ -257,29 +257,27 @@ done
 # result=0
 # show_result $result
 
-# Если настраиваемый компьютер не АРМ-АБИ, выйти
+# Если настраиваемый компьютер не АРМ АБИ, выйти
 if [ "$hostname" != "arm-abi" ]; then
     exit
 fi
 
-# Установка и настройка сервера обмена сообщениями по протоколу xmpp
+echo "Установка и настройка сервера обмена сообщениями по протоколу xmpp..."
 apt install ejabberd -y
 systemctl enable ejabberd
-# Зарегистрировать пользователей admin и syslog-agent
+# зарегистрировать пользователей admin и syslog-agent
 ejabberdctl register admin localhost $DEFAULT_PASS
 ejabberdctl register syslog-agent localhost $DEFAULT_PASS
-# Назначить пользователю admin права администратора для чего
-# в третьей строке после строки acl: заменить "" на "admin"
+# назначить пользователю admin права администратора для чего в третьей строке после строки acl: заменить "" на "admin"
 sed -i '/^acl:/{N;N;N;s/""/"admin"/}' /etc/ejabberd/ejabberd.yml
 systemctl restart ejabberd
 
-# Установка клиента обмена сообщениями по протоколу xmpp и сопутствующих библиотек
+echo "Установка клиента обмена сообщениями по протоколу xmpp и библиотек..."
 apt install psi-plus libsasl2-modules python-xmpp -y
+# не запрашивать собственную vcard при запуске psi-plus 
+sed -i 's/<query-own-vcard-on-login type="bool">true/<query-own-vcard-on-login type="bool">false/' /home/$admin_name/.config/psi+/profiles/default/options.xml
 
-# Создание именованного канала для передачи сообщенеий от парсеров клиенту отправки xmpp-sender
-# (см. https://www.freedesktop.org/software/systemd/man/latest/tmpfiles.d.html),
-echo 'p /tmp/syslog-mg.msg 0644 root root' > /etc/tmpfiles.d/syslog-ng.conf
-
+# настройка автозапуска psi-plus
 cat << EOF > "/home/$admin_name/.config/autostart/psi-plus.desktop"
 [Desktop Entry]
 Version=1.1
@@ -290,7 +288,8 @@ Exec=/usr/bin/psi-plus
 Hidden=false
 EOF
 
-# Не запрашивать собственную vcard при запуске psi-plus 
-sed -i 's/<query-own-vcard-on-login type="bool">true/<query-own-vcard-on-login type="bool">false/' /home/$admin_name/.config/psi+/profiles/default/options.xml
+# TODO Добавить остальные настройки psi-plus
 
-
+# Создание именованного канала для передачи сообщенеий от парсеров клиенту отправки xmpp-sender
+# (см. https://www.freedesktop.org/software/systemd/man/latest/tmpfiles.d.html),
+echo 'p /tmp/syslog-mg.msg 0644 root root' > /etc/tmpfiles.d/syslog-ng.conf
