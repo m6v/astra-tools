@@ -116,10 +116,12 @@ show_result $?
 
 echo -n "Настройка гарантированного удаления файлов и папок..."
 if [ $passes -ne 0 ]; then
-    # включить гарантированное удаление файлов и папок, чтобы в ext разделах  установился параметр secdel
+    # включить гарантированное удаление файлов и папок, чтобы в ext и xfs разделах  установился параметр secdel
     astra-secdel-control enable
     result=$?
     # заменить параметр secdel... на secdelrnd=1
+    # NB! В программе управления политиками безопасности fly-admin-smc
+    # включение гарантированного удаления файлов и папок для разделов xfs не отображается
     sed -i 's/secdel[^ ]*/secdelrnd=${passes}/g' /etc/fstab
 # если переменная passes имеет нулевое значение, отключить гарантированное удаление файлов и папок
 else
@@ -128,36 +130,49 @@ else
 fi
 show_result $result
 
+# 4.2 Методических рекомендаций...
 echo -n "Настройка очистки разделов подкачки..."
 astra-swapwiper-control enable
 show_result $?
 
+# 3.14 Методических рекомендаций...
 echo -n "Настройка блокировки интерпретаторов кроме Bash для пользователей..."
 astra-interpreters-lock enable
 show_result $?
 
+# 3.2 Методических рекомендаций...
 echo -n "Настройка запрета установки бита исполнения для всех пользователей, включая администраторов..."
 astra-nochmodx-lock enable
 show_result $?
 
+# 3.10 Методических рекомендаций...
 echo -n "Настройка блокировки клавиш SysRq для всех пользователей, включая администраторов..."
 astra-sysrq-lock enable
 show_result $?
 
+# 3.4 Методических рекомендаций...
 echo -n "Настройка блокировки трассировки ptrace для всех пользователей, включая администраторов..."
 astra-ptrace-lock enable
 show_result $?
 
+# 2.25 Методических рекомендаций...
 echo -n "Настройка блокировки системных команд для пользователей..."
 astra-commands-lock enable
 show_result $?
 
+# 3.3 Методических рекомендаций...
 echo -n "Настройка блокировки исполнения макросов libreoffice и VLC..."
 astra-macros-lock enable
 show_result $?
 
+# 1.30 Методических рекомендаций...
 echo -n "Настройка дополнительной аутентификации при повышении привилегий (ввода пароля для sudo)..."
 astra-sudo-control enable
+show_result $?
+
+# 2.9 Методических рекомендаций...
+echo -n "Настройка запрета вывода меню загрузчика..."
+astra-nobootmenu-control enable
 show_result $?
 
 echo -n "Настройка политики блокировки учетных записей..."
@@ -211,6 +226,12 @@ EOF
 systemctl daemon-reload
 systemctl enable afick &> /dev/null
 show_result $?
+
+echo -n "Настройка разрешения удаленного запуска графических приложений..."
+# TODO Проверить какое дефолтное значение, возможно изменять не требуется
+sed -i '/s/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
+sed -i '/s/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/sshd/ssh_config
+show_result 0
 
 echo -n "Создание групп пользователей..."
 result=0
@@ -279,6 +300,13 @@ done
 if [ "$hostname" != "arm-abi" ]; then
     exit
 fi
+
+echo -n "Настройка удаленного запуска графических приложений..."
+# Удаленный запуск командой ssh -X ip_addr app_name, если требуется от рута, то ssh -X ip_addr fly-sudo app_name
+sed -i '/s/.*ForwardX11\s.*/ForwardX11 yes/' /etc/ssh/ssh_config
+sed -i '/s/.*ForwardX11Trusted\s.*/ForwardX11Trusted yes/' /etc/ssh/ssh_config
+systemctl restart sshd
+show_result $?
 
 echo "Установка и настройка сервера обмена сообщениями по протоколу xmpp..."
 apt install ejabberd -y
