@@ -304,10 +304,15 @@ if [ "$hostname" != "arm-abi" ]; then
     exit
 fi
 
-echo -n "Установка дополнительных пакетов программ..."
+echo "Установка дополнительных пакетов программ..."
 # Установка Центра уведомлений (Панель управления->Рабочий Стол->Уведомления) (начиная с оперативного обновления 1.7.1)
 apt install fly-notifications -y
-show_result $?
+
+# Установка зависимостей СПО защищенного USB-носителя Jacarta SF/ГОСТ
+apt install libccid libpсsclite1 pcscd libusb-0.1-4 libxkbcommon0 libxkbcommon-x11-0 -y
+
+# Установка системы виртуализации
+apt install astra-kvm -y
 
 echo -n "Настройка удаленного запуска графических приложений..."
 # Удаленный запуск командой ssh -X ip_addr app_name, если требуется от рута, то ssh -X ip_addr fly-sudo app_name
