@@ -314,6 +314,9 @@ apt install libccid libpсsclite1 pcscd libusb-0.1-4 libxkbcommon0 libxkbcommon-
 # Установка системы виртуализации
 apt install astra-kvm -y
 
+# Установка интерактивной оболочки и программной библиотеки для манипулирования сетевыми пакетами
+apt install python-scapy -y
+
 echo -n "Настройка удаленного запуска графических приложений..."
 # Удаленный запуск командой ssh -X ip_addr app_name, если требуется от рута, то ssh -X ip_addr fly-sudo app_name
 sed -i '/s/.*ForwardX11\s.*/ForwardX11 yes/' /etc/ssh/ssh_config
