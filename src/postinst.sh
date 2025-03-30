@@ -15,6 +15,7 @@ users='operator:operators nachsmen:nachsmens techno:technics'
 # Дефолтный пароль для создаваемых пользователей
 DEFAULT_PASS='Aa123456'
 # Список дополнительных групп для создаваемых пользователей (возможно еще нужны pulse и pulse-access)
+# Обязательно через запятую без пробелов
 DEFAULT_GROUPS='video,users,plugdev,floppy,dialout,cdrom,audio'
 
 usage(){
@@ -84,8 +85,8 @@ if ! [[ $passes =~ $re ]]; then
     exit
 fi
 
-# TODO Добавить все валидные символы
-re='^[ocxuew]+$'
+# Все валидные символы аудита с 0 по 16 биты
+re='^[ocxudntligarmphew]+$'
 if ! [[ $events =~ $re ]]; then
     echo "$(basename $0): неверный аргумент у параметра -e, --events"
     exit
@@ -235,7 +236,6 @@ show_result 0
 
 echo -n "Создание групп пользователей..."
 result=0
-groups="operators nachsmens technics"
 for i in $groups; do
     groupadd -f $i
     ((result+=$?))
@@ -270,15 +270,10 @@ sed -i 's/pam_cracklib.so.*/pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 
 sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
 show_result 0
 
-echo -n "Настройка правил протоколирования для пользователей..."
-# Установка ключей регистрации ocxuew:ocxuew
-useraud -mno 0x1800f:0x1800f
-show_result $?
-
+: '''
+# TODO После установки ОС на всех СВТ необходимо выполнить обмен ключами
 echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы"
 result=0
-: '''
-TODO После установки ОС на всех СВТ необходимо выполнить обмен ключами
 SERVERS="arm-o server"
 
 for SERVER in SERVERS; do
@@ -292,9 +287,8 @@ for SERVER in SERVERS; do
     # Add back our key, as we have remove the former authorized keys, along with the new one!
     sshpass -p $DEFAULT_PASS ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no $USER@$SERVER || result=1
 done
+show_result $result
 '''
-# result=0
-# show_result $result
 
 # Если настраиваемый компьютер не АРМ АБИ, выйти
 if [ "$hostname" != "arm-abi" ]; then
