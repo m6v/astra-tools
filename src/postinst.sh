@@ -84,8 +84,8 @@ if ! [[ $passes =~ $re ]]; then
     exit
 fi
 
-# TODO Добавить все валидные символы
-re='^[ocxuew]+$'
+# Все валидные символы аудита с 0 по 16 биты
+re='^[ocxudntligarmphew]+$'
 if ! [[ $events =~ $re ]]; then
     echo "$(basename $0): неверный аргумент у параметра -e, --events"
     exit
@@ -319,6 +319,7 @@ for SERVER in SERVERS; do
     # Add back our key, as we have remove the former authorized keys, along with the new one!
     sshpass -p $DEFAULT_PASS ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no $USER@$SERVER || result=1
 done
+show_result $result
 '''
 # result=0
 # show_result $result
