@@ -110,6 +110,7 @@ echo -n "Настройка локального репозитория..."
 # закомментировать все незакомментированные ссылки на репозитории
 sed -i 's/^\([^#].*\)/# \1/g' /etc/apt/sources.list
 # добавить ссылку на локальный репозиторий, скопированный с установочного диска при установке системы
+# TODO Если такая ссылка есть, но она закомментирована, то раскомментировать ее
 echo 'deb file:/srv/repo/alse/base stable main contrib non-free' >> /etc/apt/sources.list
 apt update
 show_result $?
@@ -277,6 +278,29 @@ echo -n "Настройка правил протоколирования для
 # Установка ключей регистрации ocxuew:ocxuew
 useraud -mno 0x1800f:0x1800f
 show_result $?
+
+# Проверить, что указанные ниже функции ранее не добавлялись в файл
+grep "# Functions for creating special users" /etc/bash.bashrc 1>/dev/null
+if [ $? -ne 0 ]; then
+echo "Создание функций создания учетных записей операторов, начальников смен и АБИ"
+cat << EOF >> /etc/bash.bashrc
+# Functions for creating special users
+addoperator() {
+    useradd -g operators -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+}
+ 
+addnachsmen() {
+    useradd -g nachsmens -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+}
+ 
+addadmsec() {
+    useradd -g nachsmens -G $DEFAULT_GROUPS,astra-admin,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:0 -i 63 -c 0:0 \$1
+}
+EOF
+fi
 
 echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы"
 result=0

@@ -8,9 +8,9 @@ nc='\033[0m' # Нет цвета
 red='\033[0;31m' # Красный
 green='\033[0;32m' # Зеленый
 
-default_checks="audit_parms swapwiper_control secdel_control \
-            nochmodx_lock interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
-            passwords_policy blocking_policy logrotate_parms parsec_tests"
+default_checks="audit_parms swapwiper_control secdel_control nochmodx_lock \
+                interpreters_lock macros_lock ptrace_lock sysrq_lock shutdown_lock \
+                passwords_policy blocking_policy parsec_tests ssh_enable"
 
 usage(){
     echo "Использование: $(basename $0) [-l|-h|-v|-c КЛАСС] [ПРОВЕРКИ]..."
@@ -372,31 +372,6 @@ blocking_policy(){
     return $result
 }
 
-logrotate_parms(){
-    : '
-      Функция проверяет наличие в файле /etc/logrotate.conf параметра daily и значение параметра rotate
-      если параметр daily задан, а параметр rotate больше или равен 32, то проверка считается успешной
-    '
-    echo -n "Проверка периодичности ротации журналов регистрации событий ..."
-    result=0
-    if [ -z "$(grep -E '^daily' /etc/logrotate.conf)" ]; then
-        ((result++))
-    fi
-
-    if [ -z "$(grep -E '^rotate' /etc/logrotate.conf)" ]; then
-        ((result++))
-    elif [ $(grep -E '^rotate' /etc/logrotate.conf | cut -d" " -f2) -lt 32 ]; then
-        ((result++))
-    fi
-
-    if [ $result -ne 0 ]; then
-        echo -e "${red}ошибка!${nc}"
-        echo "Параметры периодичности ротации журналов регистрации событий настроены неверно" >&2
-        echo "Проверьте файл /etc/logrotate.conf" >&2
-    fi
-    return $result
-}
-
 parsec_tests(){
     : '
       Функция проверяет, что пакет parsec-tests установлен
@@ -407,6 +382,20 @@ parsec_tests(){
         echo "Средства тестирования подсистемы безопасности PARSEC не установлены" >&2
         return 1
     fi
+}
+
+ssh_enable(){
+    : '
+        Функция проверяет, что служба ssh включена
+    '
+    echo -n "Проверка состояния службы ssh ..."
+    systemctl is-active ssh 1> /dev/null
+    if [ $? -ne 0 ]; then
+        echo -e "${red}ошибка!${nc}"
+        echo "Служба ssh отключена" >&2
+        return 1
+    fi
+    return 0
 }
 
 show_groups(){
