@@ -15,7 +15,6 @@ users='operator:operators nachsmen:nachsmens techno:technics'
 # Дефолтный пароль для создаваемых пользователей
 DEFAULT_PASS='Aa123456'
 # Список дополнительных групп для создаваемых пользователей (возможно еще нужны pulse и pulse-access)
-# Обязательно через запятую без пробелов
 DEFAULT_GROUPS='video,users,plugdev,floppy,dialout,cdrom,audio'
 
 usage(){
@@ -111,6 +110,7 @@ echo -n "Настройка локального репозитория..."
 # закомментировать все незакомментированные ссылки на репозитории
 sed -i 's/^\([^#].*\)/# \1/g' /etc/apt/sources.list
 # добавить ссылку на локальный репозиторий, скопированный с установочного диска при установке системы
+# TODO Если такая ссылка есть, но она закомментирована, то раскомментировать ее
 echo 'deb file:/srv/repo/alse/base stable main contrib non-free' >> /etc/apt/sources.list
 apt update
 show_result $?
@@ -247,6 +247,7 @@ show_result 0
 
 echo -n "Создание групп пользователей..."
 result=0
+groups="operators nachsmens technics"
 for i in $groups; do
     groupadd -f $i
     ((result+=$?))
@@ -281,10 +282,38 @@ sed -i 's/pam_cracklib.so.*/pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 
 sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
 show_result 0
 
-: '''
-# TODO После установки ОС на всех СВТ необходимо выполнить обмен ключами
+echo -n "Настройка правил протоколирования для пользователей..."
+# Установка ключей регистрации ocxuew:ocxuew
+useraud -mno 0x1800f:0x1800f
+show_result $?
+
+# Проверить, что указанные ниже функции ранее не добавлялись в файл
+grep "# Functions for creating special users" /etc/bash.bashrc 1>/dev/null
+if [ $? -ne 0 ]; then
+echo "Создание функций создания учетных записей операторов, начальников смен и АБИ"
+cat << EOF >> /etc/bash.bashrc
+# Functions for creating special users
+addoperator() {
+    useradd -g operators -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+}
+ 
+addnachsmen() {
+    useradd -g nachsmens -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+}
+ 
+addadmsec() {
+    useradd -g nachsmens -G $DEFAULT_GROUPS,astra-admin,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    pdpl-user -l 0:0 -i 63 -c 0:0 \$1
+}
+EOF
+fi
+
 echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы"
 result=0
+: '''
+TODO После установки ОС на всех СВТ необходимо выполнить обмен ключами
 SERVERS="arm-o server"
 
 for SERVER in SERVERS; do
@@ -300,6 +329,8 @@ for SERVER in SERVERS; do
 done
 show_result $result
 '''
+# result=0
+# show_result $result
 
 # Если настраиваемый компьютер не АРМ АБИ, выйти
 if [ "$hostname" != "arm-abi" ]; then
