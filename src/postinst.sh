@@ -195,10 +195,18 @@ echo -n "Настройка правил протоколирования для
 useraud -mo $passes:$passes &>/dev/null
 show_result $?
 
-echo -n "Настройка периодичности ротации журналов (logrotate)..."
-sed -i 's/^weekly/daily/' /etc/logrotate.conf
-sed -i 's/^rotate.*/rotate 32/' /etc/logrotate.conf
+# Параметры ротации системных фурналов заданы в /etc/logrotate.d/syslog-ng,
+# где для большинства файлов предусмотрена еженедельная ротация с хранением четырех копий
+echo -n "Настройка хранения учетных данных о пользователях..."
+cat << EOF > /etc/logrotate.d/passwd
+/etc/passwd {
+	weekly
+	rotate 4
+	copy
+}
+EOF
 show_result 0
+
 
 echo -n "Настройка средства регламентного контроля целостности..."
 sed -i 's/^report_syslog.*/report_syslog := yes/' /etc/afick.conf
@@ -334,7 +342,7 @@ apt install psi-plus libsasl2-modules python-xmpp -y
 sed -i 's/<query-own-vcard-on-login type="bool">true/<query-own-vcard-on-login type="bool">false/' /home/$admin_name/.config/psi+/profiles/default/options.xml
 
 # настройка автозапуска psi-plus
-cat << EOF > "/home/$admin_name/.config/autostart/psi-plus.desktop"
+cat << EOF > /home/$admin_name/.config/autostart/psi-plus.desktop
 [Desktop Entry]
 Version=1.1
 Type=Application
