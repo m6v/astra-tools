@@ -207,13 +207,12 @@ cat << EOF > /etc/logrotate.d/passwd
 EOF
 show_result 0
 
-
 echo -n "Настройка средства регламентного контроля целостности..."
 sed -i 's/^report_syslog.*/report_syslog := yes/' /etc/afick.conf
 
 # Юнит для запуска afick при загрузке ОС
-# В /var/log/syslog вывод пишет всегда независимо от параметра report_syslog,
-# возможно это особенность при запуске в качестве службы systemd
+# В /var/log/syslog вывод пишется всегда, независимо от параметра report_syslog
+# возможно туда пишет syslog, а afick, только когда установлен соответствующий параметр
 # Сводка результатов пишется в /var/lib/afick/history
 cat << EOF > /etc/systemd/system/afick.service
 [Unit]
@@ -240,7 +239,6 @@ systemctl enable afick &> /dev/null
 show_result $?
 
 echo -n "Настройка разрешения удаленного запуска графических приложений..."
-# TODO Проверить какое дефолтное значение, возможно изменять не требуется
 sed -i '/s/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
 sed -i '/s/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/sshd/ssh_config
 show_result 0
@@ -268,6 +266,7 @@ done
 show_result $result
 
 echo -n "Генерация ssh-ключей администратора безопасности..."
+# NB! При создании новых учетных записей АБИ, это нужно выполнять для каждой учетной записи
 mkdir /home/$(admin_name)/.ssh
 ssh-keygen -f /home/${admin_name}/.ssh/id_rsa -q -N ""
 result=$?
@@ -283,39 +282,42 @@ sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
 show_result 0
 
 echo -n "Настройка правил протоколирования для пользователей..."
-# Установка ключей регистрации ocxuew:ocxuew
-useraud -mno 0x1800f:0x1800f
+# Установка ключей регистрации событий
+useraud -mo $events:$events 1>/dev/null
 show_result $?
 
-# TODO Проверить, что указанные ниже функции ранее не добавлялись в файл
-#      При создании учетной записи администратора безопасности на АРМ АБИ добавлять в bashrc алиас
-#      alias sudo="sudo xauth add $(xauth list $DISPLAY); \sudo"
+# Проверка, что указанные ниже функции ранее не добавлялись в файл /etc/bash.bashrc
+# TODO Если при создании учетной записи администратора нужны доп. настройки добавить их в addadmsec
+# NB! sudo использовать не нужно, пароль вводится по запросу
 grep "# Functions for creating special users" /etc/bash.bashrc 1>/dev/null
 if [ $? -ne 0 ]; then
 echo "Создание функций создания учетных записей операторов, начальников смен и АБИ"
 cat << EOF >> /etc/bash.bashrc
-# Functions for creating special users
+# Functions for creating special users, if user may not run sudo they will return
 addoperator() {
-    useradd -g operators -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+    sudo -v || return 1
+    sudo useradd -g operators -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    sudo pdpl-user -l 0:2 -i 0 -c 0:0 \$1
 }
  
 addnachsmen() {
-    useradd -g nachsmens -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    pdpl-user -l 0:2 -i 0 -c 0:0 \$1
+    sudo -v || return 1
+    sudo useradd -g nachsmens -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    sudo pdpl-user -l 0:2 -i 0 -c 0:0 \$1
 }
  
 addadmsec() {
-    useradd -g nachsmens -G $DEFAULT_GROUPS,astra-admin,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    pdpl-user -l 0:0 -i 63 -c 0:0 \$1
+    sudo -v || return 1
+    sudo useradd -g nachsmens -G $DEFAULT_GROUPS,astra-admin,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    sudo pdpl-user -l 0:0 -i 63 -c 0:0 \$1
 }
 EOF
 fi
 
-echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы"
+echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы ssh"
 result=0
 : '''
-TODO После установки ОС на всех СВТ необходимо выполнить обмен ключами
+TODO После установки ОС на все СВТ необходимо скопировать ключи администратора безопасности
 SERVERS="arm-o server"
 
 for SERVER in SERVERS; do
@@ -339,21 +341,27 @@ if [ "$hostname" != "arm-abi" ]; then
     exit
 fi
 
-echo "Установка дополнительных пакетов программ..."
-# Установка Центра уведомлений (Панель управления->Рабочий Стол->Уведомления) (начиная с оперативного обновления 1.7.1)
+echo -n "Установка Центра уведомлений..."
+# Входит в состав ОС, начиная с оперативного обновления 1.7.1
 apt install fly-notifications -y
+show_result $?
 
-# Установка зависимостей СПО защищенного USB-носителя Jacarta SF/ГОСТ
+echo -n "Установка программных библиотек для СПО защищенного USB-носителя Jacarta SF/ГОСТ..."
+# TODO Проверить актуальность списка
 apt install libccid libpсsclite1 pcscd libusb-0.1-4 libxkbcommon0 libxkbcommon-x11-0 -y
+show_result $?
 
-# Установка системы виртуализации
+echo -n "Установка системы виртуализации..."
 apt install astra-kvm -y
+show_result $?
 
-# Установка интерактивной оболочки и программной библиотеки для манипулирования сетевыми пакетами
+echo -n "Установка интерактивной оболочки и программной библиотеки для манипулирования сетевыми пакетами..."
 apt install python-scapy -y
+show_result $?
 
 echo -n "Настройка удаленного запуска графических приложений..."
-# Удаленный запуск командой ssh -X ip_addr app_name, если требуется от рута, то ssh -X ip_addr fly-sudo app_name
+# Удаленный запуск командой ssh -X ip_addr app_name,
+# если требуются права суперпользователя, то ssh -X ip_addr fly-sudo app_name
 sed -i '/s/.*ForwardX11\s.*/ForwardX11 yes/' /etc/ssh/ssh_config
 sed -i '/s/.*ForwardX11Trusted\s.*/ForwardX11Trusted yes/' /etc/ssh/ssh_config
 systemctl restart sshd
@@ -389,4 +397,5 @@ EOF
 
 # Создание именованного канала для передачи сообщенеий от парсеров клиенту отправки xmpp-sender
 # (см. https://www.freedesktop.org/software/systemd/man/latest/tmpfiles.d.html),
-echo 'p /tmp/syslog-mg.msg 0644 root root' > /etc/tmpfiles.d/syslog-ng.conf
+# Не актуально, т.к. сислог для точек назначения сам создает необходимые файлы
+# echo 'p /tmp/syslog-mg.msg 0644 root root' > /etc/tmpfiles.d/syslog-ng.conf
