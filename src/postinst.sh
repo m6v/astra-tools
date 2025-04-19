@@ -103,9 +103,6 @@ if [ -n "$hostname" ]; then
     show_result $?
 fi
 
-echo $hostname $events $passes
-exit
-
 echo -n "Настройка локального репозитория..."
 # закомментировать все незакомментированные ссылки на репозитории
 sed -i 's/^\([^#].*\)/# \1/g' /etc/apt/sources.list
@@ -192,7 +189,7 @@ show_result 0
 
 echo -n "Настройка правил протоколирования для пользователей..."
 # установка ключей регистрации, заданных в passes
-useraud -mo $passes:$passes &>/dev/null
+useraud -mo $events:$events &>/dev/null
 show_result $?
 
 # Параметры ротации системных фурналов заданы в /etc/logrotate.d/syslog-ng,
@@ -239,8 +236,8 @@ systemctl enable afick &> /dev/null
 show_result $?
 
 echo -n "Настройка разрешения удаленного запуска графических приложений..."
-sed -i '/s/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
-sed -i '/s/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/sshd/ssh_config
+sed -i '/s/.*X11Forwarding.*/X11Forwarding yes/' /etc/ssh/sshd_config
+sed -i '/s/.*X11UseLocalhost.*/X11UseLocalhost no/' /etc/ssh/sshd_config
 show_result 0
 
 echo -n "Создание групп пользователей..."
@@ -308,7 +305,7 @@ addnachsmen() {
  
 addadmsec() {
     sudo -v || return 1
-    sudo useradd -g nachsmens -G $DEFAULT_GROUPS,astra-admin,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
+    sudo useradd -g astra-admin -G $DEFAULT_GROUPS,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
     sudo pdpl-user -l 0:0 -i 63 -c 0:0 \$1
 }
 EOF

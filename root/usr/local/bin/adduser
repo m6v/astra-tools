@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+command=$(basename $0)
+if [ $command == "adduser" ]; then
+    adduser $@
+    exit $?
+fi
+
+if [ $(id -u) -ne 0 ]; then
+    echo "$command: запустите программу с правами суперпользователя"
+    exit
+fi
+
+secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
+
+usage() {
+echo "$command: использование: $command ПОЛЬЗОВАТЕЛЬ ПАРОЛЬ"
+}
+
+if [ $# -eq 0 ]; then
+usage
+exit 1
+fi
+
+case $command in
+addoperator)
+    primary_group="operators"
+    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    ;;
+addnachsmen)
+    primary_group="nachsmens"
+    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    ;;
+addadmsec)
+    primary_group="astra-admin"
+    useradd -g $primary_group -G $secondary_groups,astra-console,adm -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    pdpl-user -l 0:0 -i 63 -c 0:0 $1
+    ;;
+esac
+
+# Генерация ssh-ключей для созданого пользователя
+mkdir /home/$1/.ssh
+ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
+chown -R $1:$primary_group /home/$1/.ssh
