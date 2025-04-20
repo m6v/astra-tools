@@ -236,8 +236,8 @@ systemctl enable afick &> /dev/null
 show_result $?
 
 echo -n "Настройка разрешения удаленного запуска графических приложений..."
-sed -i '/s/.*X11Forwarding.*/X11Forwarding yes/' /etc/ssh/sshd_config
-sed -i '/s/.*X11UseLocalhost.*/X11UseLocalhost no/' /etc/ssh/sshd_config
+sed -i '/s/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
+sed -i '/s/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/ssh/sshd_config
 show_result 0
 
 echo -n "Создание групп пользователей..."

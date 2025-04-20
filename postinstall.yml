@@ -14,27 +14,40 @@
       - operators
       - nachsmens
       - technics
-    # Группы в которые включаются вновь создаваемые пользователи
-    initial_groups: "video,users,plugdev,floppy,dialout,cdrom,audio"
+  vars_prompt:
     # Пароль создаваемых пользователей
-    default_passwd: "Aa123456"
-    # Пароль администратора безопасности на настраиваемых хостах
-    ansible_sudo_pass: "Aa123456"
+    - name: default_passwd
+      prompt: USERS  password
 
   tasks:
   - name: Получение имени учетной записи администратора безопасности
     shell: id -n -u 1000
     register: admin_name
+    # имя учетной записи в {{ admin_name.stdout }}
 
   - name: Генерация ssh-ключей администратора безопасности
     shell: |
       mkdir -p /home/{{ admin_name.stdout }}/.ssh
       ssh-keygen -f /home/{{ admin_name.stdout }}/.ssh/id_rsa -q -N "" <<< y
       chown -R {{ admin_name.stdout }}:{{ admin_name.stdout }} /home/{{ admin_name.stdout }}/.ssh
-  #   args:
-  #     warn: false
+    # The warn parameter for shell was deprecated in Ansible 2.11 and removed in Ansible 2.14. 
+    # args:
+      # warn: false
 
-  - name: Включение гарантированного удаления файлов и папок
+  - name: Включение политик безопасности
+    shell:
+      "{{ item }} enable" 
+    loop:
+      - astra-swapwiper-control
+      - astra-interpreters-lock
+      - astra-sysrq-lock
+      - astra-ptrace-lock
+      - astra-commands-lock
+      - astra-macros-lock
+      - astra-sudo-control
+      - astra-nobootmenu-control
+
+  - name: Включение и настройка гарантированного удаления файлов и папок
     shell: |
       astra-secdel-control enable
       sed -i 's/secdel[^ ]*/secdelrnd={{ passes }}/g' /etc/fstab
@@ -44,39 +57,7 @@
     shell:
       astra-secdel-control disable
     when: passes == 0
-
-  - name: Настройка очистки разделов подкачки
-    shell:
-      astra-swapwiper-control enable
-
-  - name: Настройка блокировки интерпретаторов кроме Bash для пользователей
-    shell:
-      astra-interpreters-lock enable
-
-  - name: Настройка блокировки клавиш SysRq для всех пользователей, включая администраторов
-    shell:
-      astra-sysrq-lock enable
-  
-  - name: Настройка блокировки трассировки ptrace для всех пользователей, включая администраторов
-    shell:
-      astra-ptrace-lock enable      
-
-  - name: Настройка блокировки системных команд для пользователей
-    shell:
-      astra-commands-lock enable
-
-  - name: Настройка блокировки исполнения макросов libreoffice и VLC
-    shell:
-      astra-macros-lock enable
-
-  - name: Настройка дополнительной аутентификации при повышении привилегий (ввода пароля для sudo)
-    shell:
-      astra-sudo-control enable
-
-  - name: Настройка запрета вывода меню загрузчика
-    shell:
-      astra-nobootmenu-control enable
-
+     
   - name: Настройка политики блокировки учетных записей
     shell:
       sed -i 's/pam_tally.so.*/pam_tally.so deny=6 unlock_time=1800/' /etc/pam.d/common-auth
@@ -85,9 +66,9 @@
 
   - name: Настройка политики паролей
     shell: |
-      # настройка сложности (длины и алфавита) паролей
+      # Настройка сложности (длины и алфавита) паролей
       sed -i 's/pam_cracklib.so.*/pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0/' /etc/pam.d/common-password
-      # настройка максимального количества дней между сменами пароля
+      # Настройка максимального количества дней между сменами пароля
       sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
   # args:
   #   warn: false
@@ -98,8 +79,9 @@
 
   - name: Настройка разрешения удаленного запуска графических приложений
     shell: |
-      sed -i 's/.*X11Forwarding.*/X11Forwarding yes/' /etc/ssh/sshd_config
-      sed -i 's/.*X11UseLocalhost.*/X11UseLocalhost no/' /etc/ssh/sshd_config
+      # Найти в любом месте строки (.*) X11Forwarding, за ним пробел (\s) и любое кол-во произвольных символов (.*)
+      sed -i 's/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
+      sed -i 's/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/ssh/sshd_config
   # args:
   #   warn: false
 
@@ -120,7 +102,24 @@
       enabled: true
       masked: no
       daemon_reload: true
+      
+  - name: Создание символических ссылок на скрипт добавления специальных пользователей
+    file:
+      src: /usr/local/bin/adduser 
+      dest: /usr/bin/{{ item }}
+      state: link
+    loop:
+      - addoperator
+      - addnachsmen
+      - addadmsec
 
+  - name: Создание учетных записей оператора и начальника смены
+    shell: |
+      addoperator operator {{ default_passwd }}
+      addnachsmen nachsmen {{ default_passwd }}
+  # args:
+  #   warn: false
+  
 # Запрет установки бита исполнения не дает выполнять плейбуки, т.к. на удаленных хостах видимо создаются исполняемые скрипты
 # Без запрета установки бита исполнениявключение блокировки интерпретаторов также не имеет смысла,
 # поэтому как вариант решения, делать эту настройку самой последней

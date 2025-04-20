@@ -1,7 +1,7 @@
 ping:
 	ansible all -m ping -i hosts
 install:
-	ansible-playbook postinstall.yml -i hosts
+	ansible-playbook postinstall.yml -i hosts --ask-become-pass
 arch:
 	# Установка бита исполнения для исполняемых файлов
 	find root -type f -exec file {} \; | grep executable | cut -d':' -f1 | xargs chmod +x
