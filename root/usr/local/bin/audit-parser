@@ -1,0 +1,67 @@
+#!/bin/env python3
+# -*- coding: utf-8 -*-
+'''
+Программа обработки результатов событий, регистрируемых auditd.
+Запуск программы выполняется  автоматически syslog-ng,
+который после регистрации очередного события
+передает на стандартный ввод программы строку с результатами.
+Результат обработки строки записывается в именованный канал,
+для последующей отправки на сервер обмена сообщениями (ejabberd)
+'''
+
+from datetime import datetime
+import logging
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+
+appname = os.path.basename(sys.argv[0]).split('.')[0]
+logging.basicConfig(filename='/var/log/%s.log' % appname,
+                    format='%(asctime)s %(pathname)s: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    level=logging.DEBUG)
+logging.debug('%s is running...' % os.path.basename(sys.argv[0]))
+
+def handler(signum, frame):
+    signame = signal.Signals(signum).name
+    logging.debug('%s is stopped...' % os.path.basename(sys.argv[0]))
+    sys.exit(0)
+signal.signal(signal.SIGTERM, handler)
+
+hostname = socket.gethostname()
+LOG_PIPE = "/tmp/syslog-ng.msg"
+
+while True:
+    for line in sys.stdin:
+        logging.debug('Get line from auditd: %s' % line)
+        try:
+            # Получить время и идентификатор события в сообщении вида msg=audit(1116360555.329:2401771)
+            # Используем нежадный (ленивый) поиск, т.к. в сообщении можеь быть несколько полей, заключенных в скобки
+            match = re.findall('msg=audit\((.*?)\)', line)[0]
+            timestamp, eid = match.split(':')
+            # С помощью ausearch найти и вывести в человекочитаемом виде событие с идентификатором eid
+            # NB! Если стандартный ввод ausearch является каналом, поиск выполняется через stdin,
+            # а не через журналы демона аудита, поэтому используем опцию --input-logs,
+            # чтобы заставить его выполнять чтение из журналов
+            process = subprocess.run(['ausearch', '-a', eid, '--format', 'text', '--input-logs'], capture_output=True, text=True)
+            # При отсутствии сообщений в течении длительного времени, syslog генерирует MARK сообщения,
+            # информирующие получателя о том, что соединение все еще работает
+            # (периодичность задается параметром mark-freq(), а параметр mark-mode() устанавливает режим генерации,
+            # в т.ч. отключение см. стр. 201 The syslog-ng Open Source Edition 3.8 Administrator Guide)
+            # ausearch не находит их по идентификатору, поэтому пустые сообщения выводить не нужно
+            if process.stdout:
+                stdout = process.stdout.split()
+                dt = datetime.strptime(" ".join(stdout[1:3]), '%H:%M:%S %d.%m.%Y')
+                body = " ".join(stdout[3:])
+                msg = str(dt) + ' ' + body
+                # Вывести сообщение в канал для отправки его серверу обмена сообщениями
+                with open(LOG_PIPE, 'w') as fifo:
+                    logging.debug('Send msg to pipe: %s' % msg)
+                    fifo.write(msg)
+        except Exception as e:
+            # Такой вызов обеспечивает вывод стека трассировки
+            logging.exception(e)
+            continue
