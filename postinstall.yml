@@ -57,13 +57,15 @@
     shell:
       astra-secdel-control disable
     when: passes == 0
-     
+
+  # TODO Заменить на модуль lineinfile с regexp или модуль replace
   - name: Настройка политики блокировки учетных записей
     shell:
       sed -i 's/pam_tally.so.*/pam_tally.so deny=6 unlock_time=1800/' /etc/pam.d/common-auth
   # args:
   #   warn: false
 
+  # TODO Заменить на модуль lineinfile с regexp или модуль replace
   - name: Настройка политики паролей
     shell: |
       # Настройка сложности (длины и алфавита) паролей
@@ -73,10 +75,18 @@
   # args:
   #   warn: false
 
+  # TODO Проверить работоспособность!
+  - name: Настройка пути к классам обработчиков событий syslog-ng
+    lineinfile:
+      path: /etc/default/syslog-ng
+      line: PYTHONPATH="/usr/local/lib/python2.7/dist-packages"
+      insertafter: EOF
+
   - name: Настройка правил протоколирования для пользователей
     shell:
       useraud -mo {{ events }}
 
+  # TODO Заменить на модуль lineinfile с regexp или модуль replace
   - name: Настройка разрешения удаленного запуска графических приложений
     shell: |
       # Найти в любом месте строки (.*) X11Forwarding, за ним пробел (\s) и любое кол-во произвольных символов (.*)
@@ -119,7 +129,7 @@
       addnachsmen nachsmen {{ default_passwd }}
   # args:
   #   warn: false
-  
+
 # Запрет установки бита исполнения не дает выполнять плейбуки, т.к. на удаленных хостах видимо создаются исполняемые скрипты
 # Без запрета установки бита исполнениявключение блокировки интерпретаторов также не имеет смысла,
 # поэтому как вариант решения, делать эту настройку самой последней
