@@ -58,12 +58,11 @@
       astra-secdel-control disable
     when: passes == 0
 
-  # TODO Заменить на модуль lineinfile с regexp или модуль replace
   - name: Настройка политики блокировки учетных записей
-    shell:
-      sed -i 's/pam_tally.so.*/pam_tally.so deny=6 unlock_time=1800/' /etc/pam.d/common-auth
-  # args:
-  #   warn: false
+    replace:
+      path: /etc/pam.d/common-auth
+      regexp: 'pam_tally.so.*'
+      replace: 'pam_tally.so deny=6 unlock_time=1800'
 
   # TODO Заменить на модуль lineinfile с regexp или модуль replace
   - name: Настройка политики паролей
@@ -75,7 +74,6 @@
   # args:
   #   warn: false
 
-  # TODO Проверить работоспособность!
   - name: Настройка пути к классам обработчиков событий syslog-ng
     lineinfile:
       path: /etc/default/syslog-ng
@@ -86,14 +84,17 @@
     shell:
       useraud -mo {{ events }}
 
-  # TODO Заменить на модуль lineinfile с regexp или модуль replace
+  # По дефолту в Astra Linux 1.7.4 настройки правильные и не требуют изменений
   - name: Настройка разрешения удаленного запуска графических приложений
-    shell: |
-      # Найти в любом месте строки (.*) X11Forwarding, за ним пробел (\s) и любое кол-во произвольных символов (.*)
-      sed -i 's/.*X11Forwarding\s.*/X11Forwarding yes/' /etc/ssh/sshd_config
-      sed -i 's/.*X11UseLocalhost\s.*/X11UseLocalhost no/' /etc/ssh/sshd_config
-  # args:
-  #   warn: false
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      line: "{{ item.line }}"
+      regexp: "{{ item.regexp }}"
+    loop:
+      - line: X11Forwarding yes
+        regexp: ^X11Forwarding
+      - line: X11UseLocalhost no
+        regexp: ^X11UseLocalhost
 
   - name: Создание групп пользователей
     group:
