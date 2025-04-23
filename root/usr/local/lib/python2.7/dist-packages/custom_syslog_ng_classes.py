@@ -194,29 +194,31 @@ class AuditParser(object):
             # Используем нежадный (ленивый) поиск, т.к. в сообщении можеь быть несколько полей, заключенных в скобки
             match = re.findall('msg=audit\((.*?)\)', msg["MESSAGE"])[0]
             timestamp, eid = match.split(':')
+            msg["notification"] = ";".join((timestamp, eid))
 
             # С помощью ausearch найти и вывести в человекочитаемом виде событие с идентификатором eid
             # NB! Если стандартный ввод ausearch является каналом, поиск выполняется через stdin,
             # а не через журналы демона аудита, поэтому используем опцию --input-logs,
             # чтобы заставить его выполнять чтение из журналов
-
-            # NB! Нужно переделать т.к. subprocess.run() появился только в python 3.5 и более новых!
-            process = subprocess.run(['ausearch', '-a', eid, '--format', 'text', '--input-logs'], capture_output=True, text=True)
+            process = subprocess.Popen(['ausearch', '-a', eid, '--format', 'text', '--input-logs'], stdout=subprocess.PIPE)
+            stdout = process.communicate()[0]
             # При отсутствии сообщений в течении длительного времени, syslog генерирует MARK сообщения,
             # информирующие получателя о том, что соединение все еще работает
             # (периодичность задается параметром mark-freq(), а параметр mark-mode() устанавливает режим генерации,
             # в т.ч. отключение см. стр. 201 The syslog-ng Open Source Edition 3.8 Administrator Guide)
             # ausearch не находит их по идентификатору, поэтому пустые сообщения выводить не нужно
-            if process.stdout:
-                stdout = process.stdout.split()
-                dt = datetime.strptime(" ".join(stdout[1:3]), '%H:%M:%S %d.%m.%Y')
-                body = " ".join(str(dt), stdout[3:])
-
+            if stdout:
+                # NB! Почему-то ausearch на одно событие выводит 3 строки, первые две с каким-то странным временем и последняя вроде бы правильная? В терминале тоже самое, так, что дело не в subprocess.Popen!
+                # Скрипт audit-parser стал делать тоже самое, т.е. проблема на уровне ausearch или системы, почему на один eid выдается неколько событий!!
+                logging.debug(stdout)
+                '''
                 priority = "low"
                 title = "Аудит событий"
-
-                msg["notification"] = ";".join((priority, title, body))
-
+                # dt = datetime.strptime(" ".join(stdout[1:3]), '%H:%M:%S %d.%m.%Y')
+                # body = " ".join(str(dt), stdout[3:])
+                # msg["notification"] = ";".join((priority, title, body))
+                msg["notification"] = ";".join((priority, title, stdout))
+                '''
             return True
         except Exception as e:
             # Такой вызов обеспечивает вывод стека трассировки
