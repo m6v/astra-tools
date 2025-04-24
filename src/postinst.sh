@@ -283,34 +283,6 @@ echo -n "Настройка правил протоколирования для
 useraud -mo $events:$events 1>/dev/null
 show_result $?
 
-# Проверка, что указанные ниже функции ранее не добавлялись в файл /etc/bash.bashrc
-# TODO Если при создании учетной записи администратора нужны доп. настройки добавить их в addadmsec
-# NB! sudo использовать не нужно, пароль вводится по запросу
-grep "# Functions for creating special users" /etc/bash.bashrc 1>/dev/null
-if [ $? -ne 0 ]; then
-echo "Создание функций создания учетных записей операторов, начальников смен и АБИ"
-cat << EOF >> /etc/bash.bashrc
-# Functions for creating special users, if user may not run sudo they will return
-addoperator() {
-    sudo -v || return 1
-    sudo useradd -g operators -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    sudo pdpl-user -l 0:2 -i 0 -c 0:0 \$1
-}
- 
-addnachsmen() {
-    sudo -v || return 1
-    sudo useradd -g nachsmens -G $DEFAULT_GROUPS -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    sudo pdpl-user -l 0:2 -i 0 -c 0:0 \$1
-}
- 
-addadmsec() {
-    sudo -v || return 1
-    sudo useradd -g astra-admin -G $DEFAULT_GROUPS,astra-console,adm -s /bin/bash -p \$(openssl passwd -1 \$2) \$1
-    sudo pdpl-user -l 0:0 -i 63 -c 0:0 \$1
-}
-EOF
-fi
-
 echo -n "Генерация ssh-ключей администратора безопасности и копирование открытого ключа на АРМ и серверы ssh"
 result=0
 : '''

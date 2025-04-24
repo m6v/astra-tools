@@ -32,3 +32,12 @@ tar -czvf ../postinst.tar.gz .
 
 Разархивирование на целевой системе
 tar -xzvf postinst.tar.gz -C /
+
+Изменение максимального уровня целостности
+sudo sed -i 's/sysmaxlev=3/sysmaxlev=2/g' /usr/sbin/pdp-init-fs
+
+Изменить целостность содержимого командой:
+sudo pdpl-file -R -r -s 2:63:0 /
+
+Перезагрузить АРМ и проверить целостность
+sudo pdp-ls -Ma /
