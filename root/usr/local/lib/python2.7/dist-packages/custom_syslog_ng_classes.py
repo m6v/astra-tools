@@ -16,7 +16,6 @@ DROP_TIME = 5
 
 hostname = socket.gethostname()
 appname = os.path.basename(__file__).split(".")[0]
-appname = "audit_parser_class"
 
 logging.basicConfig(filename="/var/log/%s.log" % appname,
                     format="%(asctime)s %(pathname)s: %(message)s",
@@ -78,7 +77,7 @@ class AstraEventsParser(object):
             return True
 
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
             return False
 
     def deinit(self):
@@ -108,8 +107,14 @@ class AfickEventsParser(object):
             for match in re.finditer(r'([a-z_]*)(\s:\s)(\d*)', msg["MESSAGE"]):
                 results[match.group(1)] = match.group(3)
 
-            priority = "low"
             title = "Результаты контроля целостности"
+            if results["new"] != 0:
+                priority = "normal"
+            elif results["delete"] + results["changed"] != 0:
+                priority = "critical"
+            else:
+                priority = "low"
+
             body = "{0};{1};Проверена целостность {2} объектов \
             (новых: {3}, удаленных: {4}, измененных: {5})"\
                 .format(dt.strftime("%Y-%m-%d %H:%M:%S"),
@@ -123,7 +128,7 @@ class AfickEventsParser(object):
 
             return True
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
             return False
 
     def deinit(self):
@@ -169,10 +174,9 @@ class RebusEventsParser(object):
                              hostname,
                              event))
             msg["notification"] = ";".join((priority, title, body))
-
             return True
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
             return False
 
     def deinit(self):
@@ -191,34 +195,30 @@ class AuditParser(object):
     def parse(self, msg):
         try:
             # Получить время и идентификатор события в сообщении вида msg=audit(1116360555.329:2401771)
-            # Используем нежадный (ленивый) поиск, т.к. в сообщении можеь быть несколько полей, заключенных в скобки
+            # Используем нежадный (ленивый) поиск, т.к. в сообщении может быть несколько полей, заключенных в скобки
             match = re.findall('msg=audit\((.*?)\)', msg["MESSAGE"])[0]
             timestamp, eid = match.split(':')
-            msg["notification"] = ";".join((timestamp, eid))
 
             # С помощью ausearch найти и вывести в человекочитаемом виде событие с идентификатором eid
             # NB! Если стандартный ввод ausearch является каналом, поиск выполняется через stdin,
             # а не через журналы демона аудита, поэтому используем опцию --input-logs,
-            # чтобы заставить его выполнять чтение из журналов
+            # чтобы заставить ausearch выполнять чтение из журналов
             process = subprocess.Popen(['ausearch', '-a', eid, '--format', 'text', '--input-logs'], stdout=subprocess.PIPE)
-            stdout = process.communicate()[0]
+            stdout, stderr = process.communicate()
             # При отсутствии сообщений в течении длительного времени, syslog генерирует MARK сообщения,
             # информирующие получателя о том, что соединение все еще работает
-            # (периодичность задается параметром mark-freq(), а параметр mark-mode() устанавливает режим генерации,
+            # Периодичность MARK сообщений задается параметром mark-freq(), параметр mark-mode() устанавливает режим генерации,
             # в т.ч. отключение см. стр. 201 The syslog-ng Open Source Edition 3.8 Administrator Guide)
-            # ausearch не находит их по идентификатору, поэтому пустые сообщения выводить не нужно
+            # ausearch не находит MARK сообщений по идентификатору, поэтому пустые сообщения выводить не нужно
+            # Может быть и обратная ситуация, когда по одному идентификатору ausearh находит сразу несколько событий, тогда требуется выбирать последнее из них
             if stdout:
-                # NB! Почему-то ausearch на одно событие выводит 3 строки, первые две с каким-то странным временем и последняя вроде бы правильная? В терминале тоже самое, так, что дело не в subprocess.Popen!
-                # Скрипт audit-parser стал делать тоже самое, т.е. проблема на уровне ausearch или системы, почему на один eid выдается неколько событий!!
-                logging.debug(stdout)
-                '''
-                priority = "low"
                 title = "Аудит событий"
-                # dt = datetime.strptime(" ".join(stdout[1:3]), '%H:%M:%S %d.%m.%Y')
-                # body = " ".join(str(dt), stdout[3:])
-                # msg["notification"] = ";".join((priority, title, body))
-                msg["notification"] = ";".join((priority, title, stdout))
-                '''
+                priority = "low"
+                dt = datetime.strptime(stdout[3:22], '%H:%M:%S %d.%m.%Y')
+                body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
+                                 hostname,
+                                 stdout[23:]))
+                msg["notification"] = ";".join((priority, title, body))
             return True
         except Exception as e:
             # Такой вызов обеспечивает вывод стека трассировки
@@ -244,8 +244,7 @@ class GdbusSender(object):
             priority, title = msg["MESSAGE"].split(";")[:2]
             body = "\n".join(msg["MESSAGE"].split(";")[2:])
             subprocess.call("gdbus emit --system --object-path / --signal org.kde.BroadcastNotifications.Notify \"{'appName': <'my_app'>, 'appIcon': <'dialog-information'>, 'body': <'%s'>, 'summary': <'%s'>, 'uids': <['0', '1000']>} \"" % (body, title), shell=True)
-
             return True
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
             return False
