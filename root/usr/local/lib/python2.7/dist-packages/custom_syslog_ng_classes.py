@@ -203,15 +203,18 @@ class AuditParser(object):
             # NB! Если стандартный ввод ausearch является каналом, поиск выполняется через stdin,
             # а не через журналы демона аудита, поэтому используем опцию --input-logs,
             # чтобы заставить ausearch выполнять чтение из журналов
-            process = subprocess.Popen(['ausearch', '-a', eid, '--format', 'text', '--input-logs'], stdout=subprocess.PIPE)
+            # параметр --start recent задает диапазон поиска в последние 10 минут, иначе могут находиться несколько событий с одинаковым eid
+            process = subprocess.Popen(['ausearch', '-a', eid, '--format', 'text', '--start', 'recent', '--input-logs'], stdout=subprocess.PIPE)
             stdout, stderr = process.communicate()
             # При отсутствии сообщений в течении длительного времени, syslog генерирует MARK сообщения,
             # информирующие получателя о том, что соединение все еще работает
             # Периодичность MARK сообщений задается параметром mark-freq(), параметр mark-mode() устанавливает режим генерации,
             # в т.ч. отключение см. стр. 201 The syslog-ng Open Source Edition 3.8 Administrator Guide)
             # ausearch не находит MARK сообщений по идентификатору, поэтому пустые сообщения выводить не нужно
-            # Может быть и обратная ситуация, когда по одному идентификатору ausearh находит сразу несколько событий, тогда требуется выбирать последнее из них
             if stdout:
+                # Если в логах обнаруживается несколько событий с одним eid
+                # нужно брать предпоследнее stdout.split('\n')[-2],
+                # т.к. последнее это пустая строка
                 title = "Аудит событий"
                 priority = "low"
                 dt = datetime.strptime(stdout[3:22], '%H:%M:%S %d.%m.%Y')

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Уведомление о системных событиях
+Type=Application
+NoDisplay=false
+Exec=/usr/local/bin/notify-sender
+Icon=system-run
+Hidden=false
+Terminal=false
+StartupNotify=false
+X-KDE-autostart-after=astra-event-watcher
+X-KDE-autostart-phase=2

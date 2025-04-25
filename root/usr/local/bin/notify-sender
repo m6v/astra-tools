@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# Сообщения состоят из полей, разделенных символом ";"
+# В первом поле приоритет сообщения, в последующих полях текст
+while true; do
+    if read line; then
+        echo $line
+        # Получить приоритет сообщения (первое поле) и заголовок (второе поле)
+        priority=$(echo $line | cut -d';' -f1)
+        title=$(echo $line | cut -d';' -f2)
+        # Получить текст сообщения (третье и последующие поля),
+        # заменив ; на перевод строк, для нормального отображения
+        body=$(echo $line | cut -d';' -f3- | tr ';' '\n')
+        notify-send -u "$priority" "$title" "$body"
+    fi
+done < /tmp/syslog-ng.msg
