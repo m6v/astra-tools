@@ -13,16 +13,23 @@ import subprocess
 # Интервал времени между событиями с одинаковым идентификатором,
 # в течении которого последующие события отбрасываются
 DROP_TIME = 5
+# Минимальный размер уведомления auditd,
+# чтобы дропать события "did-unknown"
+MIN_EVENT_SIZE = 30
 
 hostname = socket.gethostname()
 appname = os.path.basename(__file__).split(".")[0]
 
 logging.basicConfig(filename="/var/log/%s.log" % appname,
-                    format="%(asctime)s %(pathname)s: %(message)s",
+                    format="%(asctime)s %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
                     level=logging.DEBUG)
 
-
+"""
+Парсеры сообщений syslog-ng, передаваемых в msg["MESSAGE"], и
+формирующие в msg["notification"] строку из полей, разделенных символом ;
+в которой первое поле время, второе - заголовок, последующие - текст уведомления
+"""
 class AstraEventsParser(object):
     def init(self, options):
         logging.debug("%s is running..." % type(self).__name__)
@@ -33,14 +40,8 @@ class AstraEventsParser(object):
         return True
 
     def parse(self, msg):
-        """
-        Парсер системного сообщения в msg["MESSAGE"],
-        формирующий в msg["notification"] строку из полей, разделенных символом ;
-        Первое поле время, второе - заголовок, последующие - текст уведомления
-        """
         try:
             record = json.loads(msg["MESSAGE"])
-
             # Установить приоритет сообщения (low, normal, critical)
             # в зависимости от приоритета события (debug, info, notice, warning, error, critical, alert, emergency)
             if record["PRIORITY"] in ("debug", "info", "notice"):
@@ -58,8 +59,9 @@ class AstraEventsParser(object):
             for key in ("type_ru", "name_ru", "message_id"):
                 globals()[key] = record["MSG"]["astra-audit"][key]
 
-            # Иногда за короткий интервал времени подряд идет много сообщений с одним идентификатором
-            # В этом случае показываем первое событие и отбрасываем последующие дубликаты
+            # Если за короткий интервал времени подряд
+            # пришло много сообщений с одним идентификатором,
+            # показать первое сообщение и отбросить последующие дубликаты
             timedelta = (dt - self.last_message_dt).total_seconds()
             if message_id == self.last_message_id and timedelta < DROP_TIME:
                 logging.debug("Skip similar messages with message_id: %s" % message_id)
@@ -67,7 +69,7 @@ class AstraEventsParser(object):
             self.last_message_id = message_id
             self.last_message_dt = dt
 
-            # Формируем уведомление одним элементом
+            # Сформировать уведомление одним элементом
             title = "Системное событие"
             body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
                              hostname,
@@ -77,6 +79,7 @@ class AstraEventsParser(object):
             return True
 
         except Exception as e:
+            # Запись в лог стека трассировки
             logging.exception(e)
             return False
 
@@ -94,11 +97,6 @@ class AfickEventsParser(object):
         return True
 
     def parse(self, msg):
-        """
-        Парсер сообщения сводки контроля целостности afick в msg["MESSAGE"],
-        формирующий в msg["notification"] строку из полей, разделенных символом ;
-        Первое поле время, второе - заголовок, последующие - текст уведомления
-        """
         try:
             # Первые 19 символов сообщения это дата и время
             dt = parser.parse(msg["MESSAGE"][:19], fuzzy_with_tokens=True)[0]
@@ -145,11 +143,6 @@ class RebusEventsParser(object):
         return True
 
     def parse(self, msg):
-        """
-        Парсер сообщения ПК "Ребус-СОВ" в msg["MESSAGE"],
-        формирующий в msg["notification"] строку из полей, разделенных символом ;
-        Первое поле время, второе - заголовок, последующие - текст уведомления
-        """
         try:
             # Первые 20 символов сообщения это дата и время
             dt = parser.parse(msg["MESSAGE"][:20], fuzzy_with_tokens=True)[0]
@@ -195,36 +188,26 @@ class AuditParser(object):
     def parse(self, msg):
         try:
             # Получить время и идентификатор события в сообщении вида msg=audit(1116360555.329:2401771)
-            # Используем нежадный (ленивый) поиск, т.к. в сообщении может быть несколько полей, заключенных в скобки
             match = re.findall('msg=audit\((.*?)\)', msg["MESSAGE"])[0]
             timestamp, eid = match.split(':')
-
-            # С помощью ausearch найти и вывести в человекочитаемом виде событие с идентификатором eid
-            # NB! Если стандартный ввод ausearch является каналом, поиск выполняется через stdin,
-            # а не через журналы демона аудита, поэтому используем опцию --input-logs,
-            # чтобы заставить ausearch выполнять чтение из журналов
-            # параметр --start recent задает диапазон поиска в последние 10 минут, иначе могут находиться несколько событий с одинаковым eid
-            process = subprocess.Popen(['ausearch', '-a', eid, '--format', 'text', '--start', 'recent', '--input-logs'], stdout=subprocess.PIPE)
+            # Найти и вывести событие с идентификатором eid, полученное
+            # за последние 10 минут (опция --start recent)
+            process = subprocess.Popen(['ausearch', '-a', eid, '--start', 'recent', '--format', 'text', '--input-logs'], stdout=subprocess.PIPE)
             stdout, stderr = process.communicate()
-            # При отсутствии сообщений в течении длительного времени, syslog генерирует MARK сообщения,
-            # информирующие получателя о том, что соединение все еще работает
-            # Периодичность MARK сообщений задается параметром mark-freq(), параметр mark-mode() устанавливает режим генерации,
-            # в т.ч. отключение см. стр. 201 The syslog-ng Open Source Edition 3.8 Administrator Guide)
-            # ausearch не находит MARK сообщений по идентификатору, поэтому пустые сообщения выводить не нужно
-            if stdout:
-                # Если в логах обнаруживается несколько событий с одним eid
-                # нужно брать предпоследнее stdout.split('\n')[-2],
-                # т.к. последнее это пустая строка
+            if stdout > MIN_EVENT_SIZE:
+                logging.debug("ausearch find next event(s) with eid=%s: %s" % (eid, stdout.replace("\n", ";")))
+                # Если ausearch вернул несколько событий (разделяются \n) с одинаковым eid,
+                # взять предпоследнее (последнее это пустая строка)
+                last_message = stdout.split('\n')[-2]
                 title = "Аудит событий"
                 priority = "low"
-                dt = datetime.strptime(stdout[3:22], '%H:%M:%S %d.%m.%Y')
+                dt = datetime.strptime(last_message[3:22], '%H:%M:%S %d.%m.%Y')
                 body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
                                  hostname,
-                                 stdout[23:]))
+                                 last_message[23:]))
                 msg["notification"] = ";".join((priority, title, body))
             return True
         except Exception as e:
-            # Такой вызов обеспечивает вывод стека трассировки
             logging.exception(e)
             return False
 
@@ -237,11 +220,10 @@ class GdbusSender(object):
     def send(self, msg):
         '''
         Отправка широковещательных уведомлений с помощью gdbus
-        NB! Для включения широковещательных уведомлений необходимо создать
-        конфигурационные файлы ~/.config/fly-notificationsrc и /etc/xdg/fly-notificationsrc,
-        содержащие строки
-        [Notifications]
-        ListenForBroadcasts=true
+        NB! Для включения широковещательных уведомлений
+        необходимо создать конфигурационные файлы
+        ~/.config/fly-notificationsrc и /etc/xdg/fly-notificationsrc,
+        содержащие строку ListenForBroadcasts=true в секции [Notifications]
         '''
         try:
             priority, title = msg["MESSAGE"].split(";")[:2]

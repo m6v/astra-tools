@@ -3,7 +3,15 @@ mv /etc/audit/rules.d/10-parsec.rules /etc/audit/rules.d/10-parsec.rules.bak
 иначе все события поступают с ключом parsec-p и их невозможно нормально фильтровать по назначенным кастомным ключам!
 Но, до того, как исключить правила из /etc/audit/rules.d/10-parsec.rules необходимо проверить, что системные уведомления работают нормально!!
 
-Парсер событий auditd, т.к. ausearch на один идентификатор может возвращать несколько событий, в этом случае необходимо выводить последнее из них
+syslog-ng стартует, но в логах выдает ошибки
+journalctl -u syslog-ng
+апр 25 22:11:35 arm-abi systemd[1]: Starting System Logger Daemon...
+апр 25 22:11:35 arm-abi syslog-ng[636]: DIGEST-MD5 common mech free
+апр 25 22:11:35 arm-abi syslog-ng[636]: [2025-04-25T22:11:35.411313] Current position not matches to the saved cursor position, seek to head; cursor='s=4e5ba8a821064d06bcc4214b95a31135;i=b6c;b=794dd032c51f4e11bc5b1ce708dfd53b;m=356ff1e;t=6339f198487e9;x=2d8d16efabe7b5d9', error='Success (0)'
+апр 25 22:11:35 arm-abi syslog-ng[636]: [2025-04-25T22:11:35.556642] Error resolving hostname; host='192.168.56.128'
+апр 25 22:11:35 arm-abi syslog-ng[636]: [2025-04-25T22:11:35.556660] Initiating connection failed, reconnecting; time_reopen='60'
+апр 25 22:11:35 arm-abi systemd[1]: Started System Logger Daemon.
+Попытка добавить в секцию [Unit] файла /lib/systemd/system/syslog-ng.service значение After=network.target ситуацию не поменяло
 
 Сделать плейбук для управления пользователями на всех СВТ (создание, блокирование, разблокирование, смена пароля, удаление) на случай, если в изделии предусмотрена возможность работы пользователей на разных СВТ
 
