@@ -1,6 +1,6 @@
 ---
 
-- name: My first playbook
+- name: Astra playbook
   hosts: all
   gather_facts: false
   become: true
@@ -73,6 +73,15 @@
       sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
   # args:
   #   warn: false
+
+  # TODO Сделать проверку наличия ts-format(iso) и не добавлять его повторно
+  # - name: Настройка формата представления даты и времени в логах syslog-ng
+  #   # Добавить в группу параметров options параметр ts-format(iso);
+  #   replace:
+  #     path: /etc/syslog-ng/syslog-ng.conf
+  #     # Найти две группы и вставить между ними \t  ts-format(iso);\n
+  #     regexp: '(^options[^}]*)(};)'
+  #     replace: '\1\t  ts-format(iso);\n\2'
 
   - name: Настройка пути к классам обработчиков событий syslog-ng
     lineinfile:

@@ -386,7 +386,7 @@ parsec_tests(){
 
 ssh_enable(){
     : '
-        Функция проверяет, что служба ssh включена
+      Функция проверяет, что служба ssh включена
     '
     echo -n "Проверка состояния службы ssh ..."
     systemctl is-active ssh 1> /dev/null
@@ -452,6 +452,19 @@ hosts_identification(){
         ((result++))
     fi
     return $result
+}
+
+rebus_events(){
+    : '
+      Функция проверяет правильность обработки и отображения событий от ПК "Ребус-СОВ"
+    '
+    echo -n "Проверка правильности обработки и отображения событий от ПК 'Ребус-СОВ' ..."
+    echo "Mar 21 2025 21:24:40 host CEF:0|ЗАО НИИ ЦПС|ПК <Ребус-СОВ>|1.3|900|Успешно пройдена проверка целостности сигнатур|7|sourceServiceName=Сервер СОВ msg=Целостность сигнатур на сервере СОВ успешно подтверждена cn1=1" >> /var/rebus/rebus_sov_audit.log
+    echo "Mar 15 2025 09:55:27 host CEF:0|ЗАО НИИ ЦПС|ПК <Ребус-СОВ>|1.3|900|Успешное подключение агента|7|sourceServiceName=Сервер СОВ msg=Связь со станцией 127.0.0.1 успешно установлена cn1=1" >> /var/rebus/rebus_sov_audit.log
+    echo "Mar 15 2025 22:09:56 host CEF:0|ЗАО НИИ ЦПС|ПК <Ребус-СОВ>|1.3|10|Добавлен аккаунт пользователя|7|cs1=Agent cs1Label=reaction type sourceServiceName=Анализатор событий ОС и ПО cs2=Mar 15 22:09:53 arm-abi useradd[3370]: new user: name cn1=1" >> /var/rebus/rebus_sov_audit.log
+    echo "Mar 21 2025 19:52:24 host CEF:0|ЗАО НИИ ЦПС|ПК <Ребус-СОВ>|1.3|900|Сформирован архив событий аудита|7|sourceServiceName=Сервер СОВ msg=Причина: архив переполнен; отложенный архив: '/var/log/rebus-sov/rebus-sov-arc_0000000000' cn1=1" >> /var/rebus/rebus_sov_audit.log
+    echo "Mar 21 2025 21:29:51 host CEF:0|ЗАО НИИ ЦПС|ПК <Ребус-СОВ>|1.3|10|Не вторжение. Сработало тестовое правило|3|cs1=Agent cs1Label=reaction type sourceServiceName=Сервис анализатора сетевого трафика с использованием сигнатур msg=Тестовое правило. Обнаружен ICMP-запрос cn2=1000001 proto=ipv6-icmp src=fe80::c887:e517:c391:3e89 smac=08:00:27:fc:f4:e4 spt=0 dst=ff02::2 dmac=33:33:00:00:00:02 dpt=0 cn1=1" >> /var/rebus/rebus_sov_audit.log
+    return 1
 }
 
 while [[ "$#" -gt 0 ]]; do

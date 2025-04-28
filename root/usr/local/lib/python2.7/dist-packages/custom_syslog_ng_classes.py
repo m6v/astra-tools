@@ -50,15 +50,12 @@ class AstraEventsParser(object):
                 priority = "normal"
             else:
                 priority = "critical"
-
             # В Astra Linux 1.7  используется syslog-ng 3.13 с syslog-ng-mod-python 2.7.16,
             # поэтому вместо datetime.fromisoformat, используем dateutil.parser
             dt = parser.parse(record["ISODATE"])
-
             # Получить из сообщения тип, название и идентификатор системного события
             for key in ("type_ru", "name_ru", "message_id"):
                 globals()[key] = record["MSG"]["astra-audit"][key]
-
             # Если за короткий интервал времени подряд
             # пришло много сообщений с одним идентификатором,
             # показать первое сообщение и отбросить последующие дубликаты
@@ -68,7 +65,6 @@ class AstraEventsParser(object):
                 return True
             self.last_message_id = message_id
             self.last_message_dt = dt
-
             # Сформировать уведомление одним элементом
             title = "Системное событие"
             body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
@@ -77,7 +73,6 @@ class AstraEventsParser(object):
                              name_ru))
             msg["notification"] = ";".join((priority, title, body))
             return True
-
         except Exception as e:
             # Запись в лог стека трассировки
             logging.exception(e)
@@ -177,7 +172,7 @@ class RebusEventsParser(object):
         return True
 
 
-class AuditParser(object):
+class AuditEventsParser(object):
     def __init__(self):
         pass
 

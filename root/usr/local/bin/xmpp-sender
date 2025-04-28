@@ -1,0 +1,88 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+'''
+Программа ожидает сообщений в именованном канале /tmp/syslog-ng.msg
+и получая отправляет их по протоколу xmpp пользователю admin@localhost
+'''
+import ConfigParser as configparser
+import logging
+import os
+import signal
+import sys
+import xmpp
+
+appfile = os.path.basename(sys.argv[0])
+appname = appfile.split('.')[0]
+
+config = configparser.ConfigParser()
+config.read('/usr/local/etc/%s.conf' % appname)
+# Учетные данные отправителя и получателя сообщения
+user = config.get("DEFAULT", "user")
+passwd = config.get("DEFAULT", "passwd")
+reciever = config.get("DEFAULT", "reciever")
+
+logging.basicConfig(filename='/var/log/%s.log' % appname,
+                    format='%(asctime)s %(pathname)s: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    level=logging.DEBUG)
+logging.debug('%s is running...' % appfile)
+
+def handler(signum, frame):
+    # В отличие от afick_notifier SIGINT не перехватывается?!
+    # Видимо systemd посылает какой-то другой сигнал!
+    signame = signal.Signals(signum).name
+    logging.debug('%s is stopped...' % appfile)
+    # client.disconnect()
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handler)
+
+'''
+# Изначально планировалось однократное открытие соединения и
+# последующая отправка всех сообщений в рамках него, но выяснилось,
+# что при отправке сообщений из другого сеанса сервер их не принимает
+try:
+    client = xmpp.Client('localhost')
+    client.connect(server=('localhost', 5223))
+    client.auth(user, passwd, 'botty')
+    client.sendInitPresence()
+except AttributeError as e:
+    logging.critical(e)
+    logging.critical('%s is stopped...' % appfile)
+    sys.exit(1)
+'''
+
+LOG_PIPE = "/tmp/syslog-ng.msg"
+
+try:
+    # Именованный канал создается юнтом systemd-tmpfiles-setup.service
+    fifo = open(LOG_PIPE, 'r')
+
+    # Цикл приема/отправки сообщений
+    while True:
+        for line in iter(fifo.readline, ''):
+            logging.debug('Get line from pipe: %s' % line)
+            msg = xmpp.Message(reciever, line)
+            # Если тип сообщения не указывать, то будет тип "входящее сообщение",
+            # если указать 'chat', то "сообщение из чата"
+            # Указать тим можно несколькими способами, например, msg.setAttr('type', 'chat'), msg.setType('chat') или msg['type'] = 'chat'
+            logging.debug('Send msg to ejabberd: %s' % msg)
+
+            try:
+                # Приходится открывать/закрывать соединение каждый раз при отправке сообщения,
+                # иначе в сеансе другого пользователя сервер закрывает поток с ошибкой
+                client = xmpp.Client('localhost')
+                client.connect(server=('localhost', 5223))
+                client.auth(user, passwd, 'botty')
+                client.sendInitPresence()
+                client.send(msg)
+                client.disconnect()
+            except AttributeError as e:
+                logging.critical(e)
+                logging.critical('%s is stopped...' % appfile)
+                sys.exit(1)
+
+except OSError as e:
+    logging.critical(e)
+    logging.critical('%s is stopped...' % appfile)
+    sys.exit(1)
