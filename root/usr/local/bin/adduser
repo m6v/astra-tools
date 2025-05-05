@@ -49,10 +49,9 @@ addadmsec)
     pdpl-user -l 0:0 -i 63 -c 0:0 $1
     # Создание симлинка для автозапуска программы уведомления о системных событиях
     ln -s /usr/share/applications/notify-sender.desktop /home/$1/.config/autostart
+    # Генерация ssh-ключей для созданого администратора безопасности
+    mkdir -p /home/$1/.ssh
+    ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
+    chown -R $1:$primary_group /home/$1/.ssh    
     ;;
 esac
-
-# Генерация ssh-ключей для созданого пользователя
-mkdir -p /home/$1/.ssh
-ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
-chown -R $1:$primary_group /home/$1/.ssh

@@ -5,12 +5,18 @@
   gather_facts: false
   become: true
   vars:
+    # Число неуспешных попыток аутентификации до блокировки учетной записи
+    ATTEMPTS_BEFORE_BLOCKING: 6
+    # Период разблокирования учетной записи, сек
+    UNLOCK_TIME: 1800
     # Число проходов при очистке освобождаемых блоков файловой системы
-    passes: 1
+    SECDELRND_PASSES: 1
+    # Максимальное число дней между сменами пароля
+    PASS_MAX_DAYS: 90
     # Флаги аудита успехов и отказов
-    events: "ocxuew:ocxuew"
+    AUD_FLAGS: "ocxuew:ocxuew"
     # Список создаваемых групп пользователей
-    special_groups:
+    SPECIAL_GROUPS:
       - operators
       - nachsmens
       - technics
@@ -21,21 +27,13 @@
 
   tasks:
   - name: Получение имени учетной записи администратора безопасности
-    shell: id -n -u 1000
+    ansible.builtin.shell:
+      id -n -u 1000
     register: admin_name
     # имя учетной записи в {{ admin_name.stdout }}
 
-  - name: Генерация ssh-ключей администратора безопасности
-    shell: |
-      mkdir -p /home/{{ admin_name.stdout }}/.ssh
-      ssh-keygen -f /home/{{ admin_name.stdout }}/.ssh/id_rsa -q -N "" <<< y
-      chown -R {{ admin_name.stdout }}:{{ admin_name.stdout }} /home/{{ admin_name.stdout }}/.ssh
-    # The warn parameter for shell was deprecated in Ansible 2.11 and removed in Ansible 2.14. 
-    # args:
-      # warn: false
-
   - name: Включение политик безопасности
-    shell:
+    ansible.builtin.shell:
       "{{ item }} enable" 
     loop:
       - astra-swapwiper-control
@@ -48,54 +46,56 @@
       - astra-nobootmenu-control
 
   - name: Включение и настройка гарантированного удаления файлов и папок
-    shell: |
+    ansible.builtin.shell: |
       astra-secdel-control enable
-      sed -i 's/secdel[^ ]*/secdelrnd={{ passes }}/g' /etc/fstab
-    when: passes > 0
+      sed -i 's/secdel[^ ]*/secdelrnd={{ SECDELRND_PASSES }}/g' /etc/fstab
+    when: SECDELRND_PASSES > 0
 
   - name: Выключение гарантированного удаления файлов и папок
-    shell:
+    ansible.builtin.shell:
       astra-secdel-control disable
-    when: passes == 0
+    when: SECDELRND_PASSES == 0
 
   - name: Настройка политики блокировки учетных записей
-    replace:
+    ansible.builtin.replace:
       path: /etc/pam.d/common-auth
       regexp: 'pam_tally.so.*'
-      replace: 'pam_tally.so deny=6 unlock_time=1800'
+      replace: 'pam_tally.so deny={{ ATTEMPTS_BEFORE_BLOCKING }} unlock_time={{ UNLOCK_TIME }}'
 
-  # TODO Заменить на модуль lineinfile с regexp или модуль replace
-  - name: Настройка политики паролей
-    shell: |
-      # Настройка сложности (длины и алфавита) паролей
-      sed -i 's/pam_cracklib.so.*/pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0/' /etc/pam.d/common-password
-      # Настройка максимального количества дней между сменами пароля
-      sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/' /etc/login.defs
-  # args:
-  #   warn: false
+  - name: Настройка сложности (длины и алфавита) паролей
+    ansible.builtin.replace:
+      path: /etc/pam.d/common-password
+      regexp: 'pam_cracklib.so.*'
+      replace: 'pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0'
+  
+  - name: Настройка максимального числа дней между сменами пароля
+    ansible.builtin.replace:
+      path: /etc/login.defs
+      # TODO Если параметр PASS_MAX_DAYS не найден, добавляем в конец файла
+      regexp: '^PASS_MAX_DAYS.*|\Z'
+      replace: 'PASS_MAX_DAYS {{ PASS_MAX_DAYS }}'
 
-  # TODO Сделать проверку наличия ts-format(iso) и не добавлять его повторно
-  # - name: Настройка формата представления даты и времени в логах syslog-ng
-  #   # Добавить в группу параметров options параметр ts-format(iso);
-  #   replace:
-  #     path: /etc/syslog-ng/syslog-ng.conf
-  #     # Найти две группы и вставить между ними \t  ts-format(iso);\n
-  #     regexp: '(^options[^}]*)(};)'
-  #     replace: '\1\t  ts-format(iso);\n\2'
+  - name: Настройка формата представления даты и времени в логах syslog-ng
+    # Добавить в группу параметров options параметр ts-format(iso);
+    ansible.builtin.replace:
+      path: /etc/syslog-ng/syslog-ng.conf
+      # Вставить после первой группы параметр ts-format(iso)
+      regexp: '(^options[\s\S]*?)( ts-format\(iso\);\n};|\n};)'
+      replace: '\1 ts-format(iso);\n};'
 
   - name: Настройка пути к классам обработчиков событий syslog-ng
-    lineinfile:
+    ansible.builtin.lineinfile:
       path: /etc/default/syslog-ng
       line: PYTHONPATH="/usr/local/lib/python2.7/dist-packages"
       insertafter: EOF
 
   - name: Настройка правил протоколирования для пользователей
-    shell:
-      useraud -mo {{ events }}
+    ansible.builtin.shell:
+      useraud -mo {{ AUD_FLAGS }}
 
-  # По дефолту в Astra Linux 1.7.4 настройки правильные и не требуют изменений
+  # По дефолту в Astra Linux 1.7.4 настройки ssh правильные и не требуют изменений
   - name: Настройка разрешения удаленного запуска графических приложений
-    lineinfile:
+    ansible.builtin.lineinfile:
       path: /etc/ssh/sshd_config
       line: "{{ item.line }}"
       regexp: "{{ item.regexp }}"
@@ -106,25 +106,25 @@
         regexp: ^X11UseLocalhost
 
   - name: Создание групп пользователей
-    group:
+    ansible.builtin.group:
       name: "{{ item }}"
       state: present
-    loop: "{{ special_groups }}"
+    loop: "{{ SPECIAL_GROUPS }}"
 
   - name: Извлечение новых файлов из архива
-    unarchive:
+    ansible.builtin.unarchive:
       src: postinst.tar.gz
       dest: /  
 
   - name: Включение службы контроля целостности afick
-    systemd:
+    ansible.builtin.systemd:
       name: afick
       enabled: true
       masked: no
       daemon_reload: true
       
   - name: Создание символических ссылок на скрипт добавления специальных пользователей
-    file:
+    ansible.builtin.file:
       src: /usr/local/bin/adduser 
       dest: /usr/bin/{{ item }}
       state: link
@@ -134,16 +134,16 @@
       - addadmsec
 
   - name: Создание учетных записей оператора и начальника смены
-    shell: |
+    tags: addusers
+    ansible.builtin.shell: |
       addoperator operator {{ default_passwd }}
       addnachsmen nachsmen {{ default_passwd }}
   # args:
   #   warn: false
 
-# Запрет установки бита исполнения не дает выполнять плейбуки, т.к. на удаленных хостах видимо создаются исполняемые скрипты
-# Без запрета установки бита исполнениявключение блокировки интерпретаторов также не имеет смысла,
-# поэтому как вариант решения, делать эту настройку самой последней
-# - name: Настройка запрета установки бита исполнения для всех пользователей, включая администраторов
-#   shell:
-#     astra-nochmodx-lock enable
+  # Запрет установки бита исполнения не дает выполнять плейбуки, т.к. на удаленных хостах создаются исполняемые скрипты
+  # Можно делать эту настройку самой последней, но после этого использование ansible становится невозможным
+  # - name: Настройка запрета установки бита исполнения для всех пользователей, включая администраторов
+  #   shell:
+  #     astra-nochmodx-lock enable
   
