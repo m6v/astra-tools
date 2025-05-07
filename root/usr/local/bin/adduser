@@ -30,7 +30,7 @@ addoperator)
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1 1>/dev/null
     ;;
 addnachsmen)
     primary_group="nachsmens"
@@ -38,7 +38,7 @@ addnachsmen)
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1 1>/dev/null
     ;;
 addadmsec)
     primary_group="astra-admin"
@@ -46,7 +46,7 @@ addadmsec)
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:0 -i 63 -c 0:0 $1
+    pdpl-user -l 0:0 -i 63 -c 0:0 $1 1>/dev/null
     # Создание симлинка для автозапуска программы уведомления о системных событиях
     ln -s /usr/share/applications/notify-sender.desktop /home/$1/.config/autostart
     # Генерация ssh-ключей для созданого администратора безопасности

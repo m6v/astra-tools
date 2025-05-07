@@ -69,11 +69,11 @@
       replace: 'pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0'
   
   - name: Настройка максимального числа дней между сменами пароля
-    ansible.builtin.replace:
+    # Если параметр PASS_MAX_DAYS задан, установить требуемое значение, если не задан, то задать параметр
+    ansible.builtin.lineinfile:
       path: /etc/login.defs
-      # TODO Если параметр PASS_MAX_DAYS не найден, добавляем в конец файла
-      regexp: '^PASS_MAX_DAYS.*|\Z'
-      replace: 'PASS_MAX_DAYS {{ PASS_MAX_DAYS }}'
+      regexp: '^#?PASS_MAX_DAYS.*'
+      line: 'PASS_MAX_DAYS {{ PASS_MAX_DAYS }}'
 
   - name: Настройка формата представления даты и времени в логах syslog-ng
     # Добавить в группу параметров options параметр ts-format(iso);
