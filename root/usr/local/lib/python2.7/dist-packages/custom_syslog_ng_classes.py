@@ -2,6 +2,9 @@
 
 from datetime import datetime
 from dateutil import parser, tz
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
 import json
 import logging
 import os
@@ -145,17 +148,19 @@ class RebusEventsParser(object):
             # Текст и параметры сообщения (6 поле - какое-то цифровое значение)
             event, _, params = msg["MESSAGE"].split('|')[5:8]
 
-            # Список в котором элементы соответствуют индексам первых символов названия переменных
+            # Список в котором элементы соответствуют индексам
+            # первых символов названия переменных
             indexes = [ match.start() for match in re.finditer(r'([a-zA-Z0-9_]*)=', params) ]
             indexes.append(len(params))
 
-            # Добавить в глобальную область видимости переменные из последнего поля сообщения
+            # Добавить в глобальную область видимости переменные
+            # из последнего поля сообщения
             for i in range(len(indexes)-1):
                 key, value = params[indexes[i]:indexes[i+1]-1].split("=")
                 globals()[key] = value
 
-            # TODO Разобраться в каком поле сообщения задается его уровень важности
-            # и преобразовать его в priority, а пока все low
+            # TODO Разобраться в каком поле сообщения задается уровень важности
+            # и преобразовать его в priority
             priority = "low"
             title = sourceServiceName
             body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
@@ -210,21 +215,71 @@ class AuditEventsParser(object):
         logging.debug("%s is stoped..." % type(self).__name__)
         return True
 
+class CustomDbusService(dbus.service.Object):
+    '''
+    Класс для отправки широковещательных уведомлений в системную шину
+    NB! Для включения широковещательных уведомлений
+    необходимо создать либо общий файл /etc/xdg/fly-notificationsrc,
+    либо индивидуальные файлы ~/.config/fly-notificationsrc,
+    содержащие строку ListenForBroadcasts=true в секции [Notifications]
+    '''
+    def __init__(self, bus, path):
+        dbus.service.Object.__init__(self, bus, path)
 
-class GdbusSender(object):
-    def send(self, msg):
-        '''
-        Отправка широковещательных уведомлений с помощью gdbus
-        NB! Для включения широковещательных уведомлений
-        необходимо создать конфигурационные файлы
-        ~/.config/fly-notificationsrc и /etc/xdg/fly-notificationsrc,
-        содержащие строку ListenForBroadcasts=true в секции [Notifications]
-        '''
+    @dbus.service.signal(dbus_interface="org.kde.BroadcastNotifications", signature="a{sv}")
+    # Имя метода должно соответствовать имени отправляемого сигнала,
+    # msg - словарь a{sv} со строковыми ключами (string) и произвольными значениями (variant)
+    # тело метода отсутствует, можно вставить логирование
+    def Notify(self, msg):
+        pass
+
+    def send(self, line):
         try:
-            priority, title = msg["MESSAGE"].split(";")[:2]
-            body = "\n".join(msg["MESSAGE"].split(";")[2:])
-            subprocess.call("gdbus emit --system --object-path / --signal org.kde.BroadcastNotifications.Notify \"{'appName': <'my_app'>, 'appIcon': <'dialog-information'>, 'body': <'%s'>, 'summary': <'%s'>, 'uids': <['0', '1000']>} \"" % (body, title), shell=True)
+            priority, title = line.split(";")[:2]
+            body = "\n".join(line.split(";")[2:])
+
+            if priority == "critical":
+                icon_name = "dialog-error"
+            elif priority == "normal":
+                icon_name = "dialog-warning"
+            else:
+                icon_name = "dialog-information"
+
+            msg = {"appName": "Системные события",
+                   "appIcon": icon_name,
+                   "body": body,
+                   "summary": title,
+                   "timeout": 5000,
+                   # "hints": "Text of hints",
+                   # "uids": ['0', '1000']
+                  }
+            self.Notify(msg)
+        except Exception as e:
+            logging.exception(e)
+            return False
+
+class DbusSender(object):
+    dbus_loop = DBusGMainLoop()
+    bus = dbus.SystemBus(mainloop=dbus_loop)
+    # то же можно сделать следующим образом:
+    # DBusGMainLoop(set_as_default=True)
+    # bus = dbus.SystemBus()
+    path = "/"
+    service = CustomDbusService(bus, path)
+
+    def init(self, options):
+        logging.debug("%s is running..." % type(self).__name__)
+        return True
+
+    def send(self, msg):
+        try:
+            logging.debug("Send %s to dbus" % msg["MESSAGE"])
+            self.service.send(msg["MESSAGE"])
             return True
         except Exception as e:
             logging.exception(e)
             return False
+
+    def deinit(self):
+        logging.debug("%s is stoped..." % type(self).__name__)
+        return True

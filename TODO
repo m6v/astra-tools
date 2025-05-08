@@ -1,3 +1,6 @@
+Добавить установку
+python-dbus
+
 Сделать на АРМ АБИ корректировку файла /etc/ansible/ansible.cfg для установки следующих параметров
 [defaults]
 inventory = /etc/ansible/hosts

@@ -69,11 +69,25 @@
       replace: 'pam_cracklib.so retry=3 difok=3 minlen=8 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=0'
   
   - name: Настройка максимального числа дней между сменами пароля
-    # Если параметр PASS_MAX_DAYS задан, установить требуемое значение, если не задан, то задать параметр
     ansible.builtin.lineinfile:
       path: /etc/login.defs
-      regexp: '^#?PASS_MAX_DAYS.*'
-      line: 'PASS_MAX_DAYS {{ PASS_MAX_DAYS }}'
+      regexp: ^#?PASS_MAX_DAYS
+      line: PASS_MAX_DAYS {{ PASS_MAX_DAYS }}
+
+  - name: Настройка правил протоколирования для пользователей
+    ansible.builtin.shell:
+      useraud -mo {{ AUD_FLAGS }}
+
+  - name: Настройка разрешения удаленного запуска графических приложений
+    ansible.builtin.lineinfile:
+      path: /etc/ssh/sshd_config
+      line: "{{ item.line }}"
+      regexp: "{{ item.regexp }}"
+    loop:
+      - line: X11Forwarding yes
+        regexp: ^X11Forwarding
+      - line: X11UseLocalhost no
+        regexp: ^X11UseLocalhost
 
   - name: Настройка формата представления даты и времени в логах syslog-ng
     # Добавить в группу параметров options параметр ts-format(iso);
@@ -88,28 +102,14 @@
       path: /etc/default/syslog-ng
       line: PYTHONPATH="/usr/local/lib/python2.7/dist-packages"
       insertafter: EOF
-
-  - name: Настройка правил протоколирования для пользователей
-    ansible.builtin.shell:
-      useraud -mo {{ AUD_FLAGS }}
-
-  # По дефолту в Astra Linux 1.7.4 настройки ssh правильные и не требуют изменений
-  - name: Настройка разрешения удаленного запуска графических приложений
-    ansible.builtin.lineinfile:
-      path: /etc/ssh/sshd_config
-      line: "{{ item.line }}"
-      regexp: "{{ item.regexp }}"
-    loop:
-      - line: X11Forwarding yes
-        regexp: ^X11Forwarding
-      - line: X11UseLocalhost no
-        regexp: ^X11UseLocalhost
-
-  - name: Создание групп пользователей
-    ansible.builtin.group:
-      name: "{{ item }}"
-      state: present
-    loop: "{{ SPECIAL_GROUPS }}"
+   
+  # Удалить (переименовать) /etc/audit/rules.d/10-parsec.rules, задающий для всех событий ключ parsec-p,
+  # после чего их невозможно фильтровать по собственным ключам
+  - name: Изменение настроек auditd
+    ansible.builtin.shell: |
+      if [ -f /etc/audit/rules.d/10-parsec.rules ]; then
+        mv /etc/audit/rules.d/10-parsec.rules /etc/audit/rules.d/10-parsec.rules.bak;
+      fi
 
   - name: Извлечение новых файлов из архива
     ansible.builtin.unarchive:
@@ -132,6 +132,12 @@
       - addoperator
       - addnachsmen
       - addadmsec
+
+  - name: Создание групп операторов и начальников смен
+    ansible.builtin.group:
+      name: "{{ item }}"
+      state: present
+    loop: "{{ SPECIAL_GROUPS }}"
 
   - name: Создание учетных записей оператора и начальника смены
     tags: addusers

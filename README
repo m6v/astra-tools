@@ -29,10 +29,10 @@ postinst.sh постинсталляционный скрипт
 ausearch на один eid может возвращать несколько событий, после каждого из которых идет \n.
 Для вывода последнего найденного события необходимо разделить полученную строку по \n и взять предпоследний элемент .split("\n")[-2], последний элемент пустая строка.
 
-Иногда прилетают события с did-unknown в поле ACTION
+Иногда прилетают события с did-unknown в поле ACTION, для их игнорирования проверяется длина события и, если она меньше заданного значения, такое событие удаляется
 
-Для нормальной работы с событиями auditd необходимо сделать
-mv /etc/audit/rules.d/10-parsec.rules /etc/audit/rules.d/10-parsec.rules.bak
+Для нормальной работы с событиями auditd необходимо удалить файл
+/etc/audit/rules.d/10-parsec.rules /etc/audit/rules.d/10-parsec.rules.bak
 иначе все события поступают с ключом parsec-p и их невозможно нормально фильтровать по назначенным кастомным ключам!
 
 Создание архива в инструментальной системе
@@ -49,3 +49,16 @@ sudo sed -i 's/sysmaxlev=3/sysmaxlev=2/g' /usr/sbin/pdp-init-fs
 sudo pdpl-file -R -r -s 2:63:0 /
 после чего перезагрузить АРМ и проверить целостность командой
 sudo pdp-ls -Ma /
+
+Управление пользователями
+Показать
+showusers # Кастомный скрипт
+Создание пользователя
+addoperator user_name password
+addnachsmen user_name password
+addadmsec user_name password
+Блокирование/разблокирование
+passwd -l user_name # Можно сделать alias lockuser='passwd -l'
+passwd -u user_name # Можно сделать alias unlockuser='passwd -u'
+Удаление
+deluser user_name --remove-home
