@@ -26,7 +26,7 @@ appname = os.path.basename(__file__).split(".")[0]
 logging.basicConfig(filename="/var/log/%s.log" % appname,
                     format="%(asctime)s %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 
 """
 Парсеры сообщений syslog-ng, передаваемых в msg["MESSAGE"], и
@@ -53,19 +53,28 @@ class AstraEventsParser(object):
                 priority = "normal"
             else:
                 priority = "critical"
+
             # В Astra Linux 1.7  используется syslog-ng 3.13 с syslog-ng-mod-python 2.7.16,
             # поэтому вместо datetime.fromisoformat, используем dateutil.parser
             dt = parser.parse(record["ISODATE"])
+
+            # Если полученное сообщение не типа astra-audit пропустить его
+            if not "astra-audit" in record["MSG"]:
+                logging.debug('%s skip none astra-audit message' % type(self).__name__)
+                return False
+
             # Получить из сообщения тип, название и идентификатор системного события
             for key in ("type_ru", "name_ru", "message_id"):
                 globals()[key] = record["MSG"]["astra-audit"][key]
+
             # Если за короткий интервал времени подряд
             # пришло много сообщений с одним идентификатором,
             # показать первое сообщение и отбросить последующие дубликаты
             timedelta = (dt - self.last_message_dt).total_seconds()
             if message_id == self.last_message_id and timedelta < DROP_TIME:
-                # logging.debug("Skip similar messages with message_id: %s" % message_id)
-                return True
+                logging.debug('%s has skiped similar message with id: "%s"' % (type(self).__name__, message_id))
+                return False
+
             self.last_message_id = message_id
             self.last_message_dt = dt
             # Сформировать уведомление одним элементом
@@ -74,8 +83,10 @@ class AstraEventsParser(object):
                              hostname,
                              type_ru,
                              name_ru))
+
             msg["notification"] = ";".join((priority, title, body))
             return True
+
         except Exception as e:
             logging.error('%s get message "%s"' % (type(self).__name__, record))
             logging.exception(e)
@@ -97,11 +108,13 @@ class AfickEventsParser(object):
     def parse(self, msg):
         try:
             # Первые 19 символов сообщения это дата и время
-            dt = parser.parse(msg["MESSAGE"][:19], fuzzy_with_tokens=True)[0]
+            dt = parser.parse(msg["MESSAGE"][:19], fuzzy=True)
 
             results = {}
             for match in re.finditer(r'([a-z_]*)(\s:\s)(\d*)', msg["MESSAGE"]):
-                results[match.group(1)] = match.group(3)
+                results[match.group(1)] = int(match.group(3))
+
+            logging.debug('%s has recieved "%s"' % (type(self).__name__, results))
 
             title = "Результаты контроля целостности"
             if results["new"] != 0:
@@ -120,8 +133,8 @@ class AfickEventsParser(object):
                         results["changed"])
 
             msg["notification"] = ";".join((priority, title, body))
-
             return True
+
         except Exception as e:
             logging.exception(e)
             return False
@@ -142,7 +155,7 @@ class RebusEventsParser(object):
     def parse(self, msg):
         try:
             # Первые 20 символов сообщения это дата и время
-            dt = parser.parse(msg["MESSAGE"][:20], fuzzy_with_tokens=True)[0]
+            dt = parser.parse(msg["MESSAGE"][:20], fuzzy=True)
 
             # Текст и параметры сообщения (6 поле - какое-то цифровое значение)
             event, _, params = msg["MESSAGE"].split('|')[5:8]
@@ -167,6 +180,7 @@ class RebusEventsParser(object):
                              event))
             msg["notification"] = ";".join((priority, title, body))
             return True
+
         except Exception as e:
             logging.exception(e)
             return False
@@ -197,19 +211,21 @@ class AuditEventsParser(object):
             # он возвращает multiline string,  которую сплитим в список
             lines = stdout.splitlines()
 
-            logging.debug("ausearch find next event(s) with eid=%s: %s" % (eid, ";".join(lines)))
+            logging.debug("Ausearch has found event(s) with eid=%s: %s" % (eid, ";".join(lines)))
 
-            # Используем последнее из событий, найденных ausearch
+            # Используем последнее событие, найденное ausearch
             last_message = lines[-1]
             if len(last_message) > MIN_EVENT_SIZE:
                 title = "Аудит событий"
                 priority = "low"
-                dt = datetime.strptime(last_message[3:22], '%H:%M:%S %d.%m.%Y')
+                dt = parser.parse(last_message[3:22], fuzzy=True)
                 body = ";".join((dt.strftime("%Y-%m-%d %H:%M:%S"),
                                  hostname,
                                  last_message[23:]))
                 msg["notification"] = ";".join((priority, title, body))
-            return True
+                return True
+            else:
+                return False
         except Exception as e:
             logging.exception(e)
             return False
@@ -241,8 +257,6 @@ class CustomDbusService(dbus.service.Object):
 
     def send(self, line):
         try:
-            logging.debug('%s get message "%s"' % (type(self).__name__,
-                                                   line))
             priority, title = line.split(";")[:2]
             body = "\n".join(line.split(";")[2:])
 
@@ -261,6 +275,7 @@ class CustomDbusService(dbus.service.Object):
                    # "hints": "Text of hints",
                    # "uids": ['0', '1000']
                   }
+            # logging.debug('%s has sent message "%s"' % (type(self).__name__, msg))
             self.Notify(msg)
         except Exception as e:
             logging.exception(e)
@@ -281,8 +296,8 @@ class DbusSender(object):
 
     def send(self, msg):
         try:
-            logging.debug('%s send message "%s"' % (type(self).__name__,
-                                                    msg["MESSAGE"]))
+            logging.debug('%s has sent message "%s"' % (type(self).__name__,
+                                                        msg["MESSAGE"]))
             self.service.send(msg["MESSAGE"])
             return True
         except Exception as e:
