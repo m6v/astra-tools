@@ -26,7 +26,7 @@ appname = os.path.basename(__file__).split(".")[0]
 logging.basicConfig(filename="/var/log/%s.log" % appname,
                     format="%(asctime)s %(message)s",
                     datefmt="%Y-%m-%d %H:%M:%S",
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 
 """
 Парсеры сообщений syslog-ng, передаваемых в msg["MESSAGE"], и
@@ -60,7 +60,7 @@ class AstraEventsParser(object):
 
             # Если полученное сообщение не типа astra-audit пропустить его
             if not "astra-audit" in record["MSG"]:
-                logging.debug('%s skip none astra-audit message' % type(self).__name__)
+                logging.debug('%s has skiped none astra-audit message' % type(self).__name__)
                 return False
 
             # Получить из сообщения тип, название и идентификатор системного события
@@ -86,9 +86,8 @@ class AstraEventsParser(object):
 
             msg["notification"] = ";".join((priority, title, body))
             return True
-
         except Exception as e:
-            logging.error('%s get message "%s"' % (type(self).__name__, record))
+            logging.error('%s has recieved message "%s"' % (type(self).__name__, record))
             logging.exception(e)
             return False
 
@@ -124,17 +123,27 @@ class AfickEventsParser(object):
             else:
                 priority = "low"
 
-            body = "{0};{1};Проверена целостность {2} объектов (новых: {3}, удаленных: {4}, измененных: {5})"\
-                .format(dt.strftime("%Y-%m-%d %H:%M:%S"),
-                        hostname,
-                        results["compare"],
-                        results["new"],
-                        results["delete"],
-                        results["changed"])
+            # Дефолтными настройками задано ежесуточное обновление БД контроля целостности,
+            # после которого вместо ключа "compare" в сводке ключ "update"
+            if "compare" in results:
+                body = "{0};{1};Проверена целостность {2} объектов (новых: {3}, удаленных: {4}, измененных: {5})"\
+                    .format(dt.strftime("%Y-%m-%d %H:%M:%S"),
+                            hostname,
+                            results["compare"],
+                            results["new"],
+                            results["delete"],
+                            results["changed"])
+            else:
+                body = "{0};{1};Обновлены контр. суммы {2} объектов (новых: {3}, удаленных: {4}, измененных: {5})"\
+                    .format(dt.strftime("%Y-%m-%d %H:%M:%S"),
+                            hostname,
+                            results["update"],
+                            results["new"],
+                            results["delete"],
+                            results["changed"])
 
             msg["notification"] = ";".join((priority, title, body))
             return True
-
         except Exception as e:
             logging.exception(e)
             return False
@@ -180,7 +189,6 @@ class RebusEventsParser(object):
                              event))
             msg["notification"] = ";".join((priority, title, body))
             return True
-
         except Exception as e:
             logging.exception(e)
             return False
@@ -249,8 +257,7 @@ class CustomDbusService(dbus.service.Object):
     def Notify(self, msg):
         '''
         Имя метода должно соответствовать имени отправляемого сигнала,
-        а сообщение должно соответствовать объявленной сигнатуре a{sv},
-        т.е быть словарем со строковыми ключами (string) и произвольными значениями (variant)
+        а сообщение объявленной сигнатуре a{sv}, т.е быть словарем со строковыми ключами (string) и произвольными значениями (variant)
         Тело метода отсутствует, можно вставить логирование
         '''
         pass
@@ -275,7 +282,8 @@ class CustomDbusService(dbus.service.Object):
                    # "hints": "Text of hints",
                    # "uids": ['0', '1000']
                   }
-            # logging.debug('%s has sent message "%s"' % (type(self).__name__, msg))
+            logging.debug('%s has sent message "%s"' % (type(self).__name__, str(msg).decode("string-escape")))
+            # В Python3.x str(msg).decode("string-escape").encode("latin1").decode("utf-8")
             self.Notify(msg)
         except Exception as e:
             logging.exception(e)
@@ -284,7 +292,7 @@ class CustomDbusService(dbus.service.Object):
 class DbusSender(object):
     dbus_loop = DBusGMainLoop()
     bus = dbus.SystemBus(mainloop=dbus_loop)
-    # то же можно сделать следующим образом:
+    # или
     # DBusGMainLoop(set_as_default=True)
     # bus = dbus.SystemBus()
     path = "/"
@@ -296,8 +304,7 @@ class DbusSender(object):
 
     def send(self, msg):
         try:
-            logging.debug('%s has sent message "%s"' % (type(self).__name__,
-                                                        msg["MESSAGE"]))
+            logging.info('%s has sent message "%s"' % (type(self).__name__, msg["MESSAGE"]))
             self.service.send(msg["MESSAGE"])
             return True
         except Exception as e:

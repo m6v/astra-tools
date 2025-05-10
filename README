@@ -62,3 +62,5 @@ passwd -l user_name # Можно сделать alias lockuser='passwd -l'
 passwd -u user_name # Можно сделать alias unlockuser='passwd -u'
 Удаление
 deluser user_name --remove-home
+Смена пароля
+
