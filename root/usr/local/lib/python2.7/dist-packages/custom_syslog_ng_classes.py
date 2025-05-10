@@ -28,15 +28,34 @@ logging.basicConfig(filename="/var/log/%s.log" % appname,
                     datefmt="%Y-%m-%d %H:%M:%S",
                     level=logging.DEBUG)
 
+class CustomEventsParser(object):
+    """
+    Родительский класс для всех кастомных парсеров логиров
+    """
+    def init(self, options):
+        logging.info("%s is running..." % type(self).__name__)
+        return True
+
+    def parse(self, msg):
+        try:
+            self.message = msg["MESSAGE"]
+            logging.debug('%s recieved message "%s"' % (type(self).__name__, self.message))
+        except Exception as e:
+            logging.exception(e)
+            return False
+
+    def deinit(self):
+        logging.info("%s is stoped..." % type(self).__name__)
+        return True
+
 """
 Парсеры сообщений syslog-ng, передаваемых в msg["MESSAGE"], и
 формирующие в msg["notification"] строку из полей, разделенных символом ;
 в которой первое поле время, второе - заголовок, последующие - текст уведомления
 """
-class AstraEventsParser(object):
+class AstraEventsParser(CustomEventsParser):
     def init(self, options):
-        logging.info("%s is running..." % type(self).__name__)
-
+        super(AstraEventsParser, self).init(options)
         # Идентификатор и время последнего события
         self.last_message_id = ""
         self.last_message_dt = datetime.now(tz=tz.tzlocal())
@@ -44,6 +63,7 @@ class AstraEventsParser(object):
 
     def parse(self, msg):
         try:
+            super(AstraEventsParser, self).parse(msg)
             record = json.loads(msg["MESSAGE"])
             # Установить приоритет сообщения (low, normal, critical)
             # в зависимости от приоритета события (debug, info, notice, warning, error, critical, alert, emergency)
@@ -60,7 +80,7 @@ class AstraEventsParser(object):
 
             # Если полученное сообщение не типа astra-audit пропустить его
             if not "astra-audit" in record["MSG"]:
-                logging.debug('%s has skiped none astra-audit message' % type(self).__name__)
+                logging.debug('%s skiped none astra-audit message' % type(self).__name__)
                 return False
 
             # Получить из сообщения тип, название и идентификатор системного события
@@ -72,7 +92,7 @@ class AstraEventsParser(object):
             # показать первое сообщение и отбросить последующие дубликаты
             timedelta = (dt - self.last_message_dt).total_seconds()
             if message_id == self.last_message_id and timedelta < DROP_TIME:
-                logging.debug('%s has skiped similar message with id: "%s"' % (type(self).__name__, message_id))
+                logging.debug('%s skiped similar message with id: "%s"' % (type(self).__name__, message_id))
                 return False
 
             self.last_message_id = message_id
@@ -87,33 +107,20 @@ class AstraEventsParser(object):
             msg["notification"] = ";".join((priority, title, body))
             return True
         except Exception as e:
-            logging.error('%s has recieved message "%s"' % (type(self).__name__, record))
             logging.exception(e)
             return False
 
-    def deinit(self):
-        logging.info("%s is stoped..." % type(self).__name__)
-        return True
 
-
-class AfickEventsParser(object):
-    def __init__(self):
-        pass
-
-    def init(self, options):
-        logging.info("%s is running..." % type(self).__name__)
-        return True
-
+class AfickEventsParser(CustomEventsParser):
     def parse(self, msg):
         try:
+            super(AfickEventsParser, self).parse(msg)
             # Первые 19 символов сообщения это дата и время
             dt = parser.parse(msg["MESSAGE"][:19], fuzzy=True)
 
             results = {}
             for match in re.finditer(r'([a-z_]*)(\s:\s)(\d*)', msg["MESSAGE"]):
                 results[match.group(1)] = int(match.group(3))
-
-            logging.debug('%s has recieved "%s"' % (type(self).__name__, results))
 
             title = "Результаты контроля целостности"
             if results["new"] != 0:
@@ -148,21 +155,11 @@ class AfickEventsParser(object):
             logging.exception(e)
             return False
 
-    def deinit(self):
-        logging.info("%s is stoped..." % type(self).__name__)
-        return True
 
-
-class RebusEventsParser(object):
-    def __init__(self):
-        pass
-
-    def init(self, options):
-        logging.info("%s is running..." % type(self).__name__)
-        return True
-
+class RebusEventsParser(CustomEventsParser):
     def parse(self, msg):
         try:
+            super(RebusEventsParser, self).parse(msg)
             # Первые 20 символов сообщения это дата и время
             dt = parser.parse(msg["MESSAGE"][:20], fuzzy=True)
 
@@ -193,21 +190,11 @@ class RebusEventsParser(object):
             logging.exception(e)
             return False
 
-    def deinit(self):
-        logging.info("%s is stoped..." % type(self).__name__)
-        return True
 
-
-class AuditEventsParser(object):
-    def __init__(self):
-        pass
-
-    def init(self, options):
-        logging.info("%s is running..." % type(self).__name__)
-        return True
-
+class AuditEventsParser(CustomEventsParser):
     def parse(self, msg):
         try:
+            super(AuditEventsParser, self).parse(msg)
             # Получить время и идентификатор события в сообщении вида msg=audit(1116360555.329:2401771)
             match = re.findall('msg=audit\((.*?)\)', msg["MESSAGE"])[0]
             timestamp, eid = match.split(':')
@@ -219,7 +206,7 @@ class AuditEventsParser(object):
             # он возвращает multiline string,  которую сплитим в список
             lines = stdout.splitlines()
 
-            logging.debug("Ausearch has found event(s) with eid=%s: %s" % (eid, ";".join(lines)))
+            logging.debug("Ausearch found event(s) with eid=%s: %s" % (eid, ";".join(lines)))
 
             # Используем последнее событие, найденное ausearch
             last_message = lines[-1]
@@ -238,9 +225,6 @@ class AuditEventsParser(object):
             logging.exception(e)
             return False
 
-    def deinit(self):
-        logging.info("%s is stoped..." % type(self).__name__)
-        return True
 
 class CustomDbusService(dbus.service.Object):
     '''
@@ -282,7 +266,7 @@ class CustomDbusService(dbus.service.Object):
                    # "hints": "Text of hints",
                    # "uids": ['0', '1000']
                   }
-            logging.debug('%s has sent message "%s"' % (type(self).__name__, str(msg).decode("string-escape")))
+            # logging.debug('%s sent message "%s"' % (type(self).__name__, str(msg).decode("string-escape")))
             # В Python3.x str(msg).decode("string-escape").encode("latin1").decode("utf-8")
             self.Notify(msg)
         except Exception as e:
@@ -304,7 +288,7 @@ class DbusSender(object):
 
     def send(self, msg):
         try:
-            logging.info('%s has sent message "%s"' % (type(self).__name__, msg["MESSAGE"]))
+            logging.info('%s sent message "%s"' % (type(self).__name__, msg["MESSAGE"]))
             self.service.send(msg["MESSAGE"])
             return True
         except Exception as e:
