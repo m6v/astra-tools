@@ -13,7 +13,7 @@ import socket
 import sys
 import subprocess
 
-# Интервал времени между событиями с одинаковым идентификатором,
+# Интервал времени (сек) между событиями с одинаковым идентификатором,
 # в течении которого последующие события отбрасываются
 DROP_TIME = 5
 # Минимальный размер уведомления auditd, чтобы исключать неопознанные (did-unknown) события,
@@ -28,15 +28,21 @@ logging.basicConfig(filename="/var/log/%s.log" % appname,
                     datefmt="%Y-%m-%d %H:%M:%S",
                     level=logging.DEBUG)
 
-class CustomEventsParser(object):
+class EventsParser(object):
     """
-    Родительский класс для всех кастомных парсеров логиров
+    Родительский класс для кастомных парсеров логов
     """
     def init(self, options):
         logging.info("%s is running..." % type(self).__name__)
         return True
 
     def parse(self, msg):
+        """
+        Наследники должны обработать msg["MESSAGE"], сохраненное в  self.message
+        и сформировать msg["notification"], содержащее строку из полей,
+        разделенных символом ; в которой первое поле приоритет,
+        второе - заголовок, последующие - текст уведомления
+        """
         try:
             self.message = msg["MESSAGE"]
             logging.debug('%s recieved message "%s"' % (type(self).__name__, self.message))
@@ -48,12 +54,8 @@ class CustomEventsParser(object):
         logging.info("%s is stoped..." % type(self).__name__)
         return True
 
-"""
-Парсеры сообщений syslog-ng, передаваемых в msg["MESSAGE"], и
-формирующие в msg["notification"] строку из полей, разделенных символом ;
-в которой первое поле время, второе - заголовок, последующие - текст уведомления
-"""
-class AstraEventsParser(CustomEventsParser):
+
+class AstraEventsParser(EventsParser):
     def init(self, options):
         super(AstraEventsParser, self).init(options)
         # Идентификатор и время последнего события
@@ -64,7 +66,7 @@ class AstraEventsParser(CustomEventsParser):
     def parse(self, msg):
         try:
             super(AstraEventsParser, self).parse(msg)
-            record = json.loads(msg["MESSAGE"])
+            record = json.loads(self.message)
             # Установить приоритет сообщения (low, normal, critical)
             # в зависимости от приоритета события (debug, info, notice, warning, error, critical, alert, emergency)
             if record["PRIORITY"] in ("debug", "info", "notice"):
@@ -111,15 +113,15 @@ class AstraEventsParser(CustomEventsParser):
             return False
 
 
-class AfickEventsParser(CustomEventsParser):
+class AfickEventsParser(EventsParser):
     def parse(self, msg):
         try:
             super(AfickEventsParser, self).parse(msg)
             # Первые 19 символов сообщения это дата и время
-            dt = parser.parse(msg["MESSAGE"][:19], fuzzy=True)
+            dt = parser.parse(self.message[:19], fuzzy=True)
 
             results = {}
-            for match in re.finditer(r'([a-z_]*)(\s:\s)(\d*)', msg["MESSAGE"]):
+            for match in re.finditer(r'([a-z_]*)(\s:\s)(\d*)', self.message):
                 results[match.group(1)] = int(match.group(3))
 
             title = "Результаты контроля целостности"
@@ -156,15 +158,15 @@ class AfickEventsParser(CustomEventsParser):
             return False
 
 
-class RebusEventsParser(CustomEventsParser):
+class RebusEventsParser(EventsParser):
     def parse(self, msg):
         try:
             super(RebusEventsParser, self).parse(msg)
             # Первые 20 символов сообщения это дата и время
-            dt = parser.parse(msg["MESSAGE"][:20], fuzzy=True)
+            dt = parser.parse(self.message[:20], fuzzy=True)
 
             # Текст и параметры сообщения (6 поле - какое-то цифровое значение)
-            event, _, params = msg["MESSAGE"].split('|')[5:8]
+            event, _, params = self.message.split('|')[5:8]
 
             # Список в котором элементы соответствуют индексам
             # первых символов названия переменных
@@ -191,12 +193,12 @@ class RebusEventsParser(CustomEventsParser):
             return False
 
 
-class AuditEventsParser(CustomEventsParser):
+class AuditEventsParser(EventsParser):
     def parse(self, msg):
         try:
             super(AuditEventsParser, self).parse(msg)
             # Получить время и идентификатор события в сообщении вида msg=audit(1116360555.329:2401771)
-            match = re.findall('msg=audit\((.*?)\)', msg["MESSAGE"])[0]
+            match = re.findall('msg=audit\((.*?)\)', self.message)[0]
             timestamp, eid = match.split(':')
             # Найти и вывести событие с идентификатором eid, полученное
             # за последние 10 минут (опция --start recent)
@@ -208,7 +210,7 @@ class AuditEventsParser(CustomEventsParser):
 
             logging.debug("Ausearch found event(s) with eid=%s: %s" % (eid, ";".join(lines)))
 
-            # Используем последнее событие, найденное ausearch
+            # Использовать последнее событие, найденное ausearch
             last_message = lines[-1]
             if len(last_message) > MIN_EVENT_SIZE:
                 title = "Аудит событий"
@@ -229,7 +231,7 @@ class AuditEventsParser(CustomEventsParser):
 class CustomDbusService(dbus.service.Object):
     '''
     Класс для отправки широковещательных уведомлений в системную шину
-    Для включения широковещательных уведомлений необходимо создать
+    Для приема широковещательных уведомлений необходимо создать
     либо общий файл /etc/xdg/fly-notificationsrc,
     либо индивидуальные файлы ~/.config/fly-notificationsrc,
     содержащие строку ListenForBroadcasts=true в секции [Notifications]
@@ -288,8 +290,12 @@ class DbusSender(object):
 
     def send(self, msg):
         try:
-            logging.info('%s sent message "%s"' % (type(self).__name__, msg["MESSAGE"]))
-            self.service.send(msg["MESSAGE"])
+            # Пропустить пустые MARK сообщения, которые syslog-ng генерирует
+            # с заданной в настройках периодичностью (по умолчанию 20 мин)
+            # для информирования получателя о работающем соединении
+            if msg["MESSAGE"]:
+                logging.info('%s recieved message "%s"' % (type(self).__name__, msg["MESSAGE"]))
+                self.service.send(msg["MESSAGE"])
             return True
         except Exception as e:
             logging.exception(e)
