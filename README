@@ -1,25 +1,40 @@
 В каталоге root создается дерево каталогов с файлами которые при постинсталяционной настройке копируются в целевую систему
+
 root
+/
 ├── etc
+│   ├── afick.conf
+│   ├── audit
+│   │   └── rules.d
+│   │       └── astra-custom.rules
+│   ├── logrotate.d
+│   │   └── passwd
 │   ├── syslog-ng
 │   │   └── conf.d
-│   │       └── afick.conf
-│   │       └── auth.conf
-│   └── systemd
-│       └── system
-│           └── afick.service
-│           └── xmpp-sender.service
-├── root
-│   └── afick-check
-│   └── astra-check
-│   └── chkperms.sh
-│   └── getperms.sh
-├── tmp
-│   └── postinst.sh
+│   │       ├── afick-events.conf
+│   │       ├── astra-custom.conf
+│   │       ├── astra-events.conf
+│   │       ├── audit-events.conf
+│   │       └── rebus-events.conf
+│   ├── systemd
+│   │   └── system
+│   │       └── afick.service
+│   └── tmpfiles.d
+│       └── syslog-ng.conf
 └── usr
-    └── local
-        └── bin
-            └── afick_notifier
+    ├── local
+    │   ├── bin
+    │   │   ├── adduser
+    │   │   ├── notify-sender
+    │   │   ├── showusers
+    │   │   └── xmpp-sender
+    │   └── lib
+    │       └── python2.7
+    │           └── dist-packages
+    │               └── custom_syslog_ng_classes.py
+    └── share
+        └── applications
+            └── notify-sender.desktop
 
 afick.service юнит средства регламентного контроля целостности afick
 afick.conf конфигурационный файл syslog-ng для логирования результатов работы afick
