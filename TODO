@@ -1,5 +1,15 @@
 Добавить установку python-dbus и конфиг с разрешением приема широковещательных сообщений
 
+Переименовать adduser в userctrl и сделать следующие варианты использования
+userctrl showusers
+userctrl addadmin user_name password
+userctrl addoperator user_name password
+userctrl addnachsmen user_name password
+userctrl deluser user_name
+userctrl lockuser user_name
+userctrl unlockuser user_name
+если user_name не задано и программа запущена не из скрипта, запрашивать имя пользователя интерактивно
+
 Попробовать брать результаты КЦ не из /var/lib/afick/history, а из journald
 
 Сделать отключение ненужных служб

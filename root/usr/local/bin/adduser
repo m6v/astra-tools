@@ -48,7 +48,10 @@ addadmsec)
     fi
     pdpl-user -l 0:0 -i 63 -c 0:0 $1 1>/dev/null
     # Создание симлинка для автозапуска программы уведомления о системных событиях
+    # Если будет рассылка широковещательных уведомлений, то удалить это действие
     ln -s /usr/share/applications/notify-sender.desktop /home/$1/.config/autostart
+    # Создание файла с разрешением приема широковещательных сообщений
+    echo -e "[Notifications]\nListenForBroadcasts=true" > /home/$1/.config/fly-notificationsrc
     # Генерация ssh-ключей для созданого администратора безопасности
     mkdir -p /home/$1/.ssh
     ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""

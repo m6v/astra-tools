@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+usage() {
+    echo "Использование: userctl КОМАНДА [ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]]"
+    echo "Выполняет операции с учетными записями пользователей, требует прав суперпользователя"
+    echo "КОМАНДЫ:"
+    echo "  addadmsec   создать ПОЛЬЗОВАТЕЛЯ с правами администратора безопасности"
+    echo "  addnachsmen создать ПОЛЬЗОВАТЕЛЯ с правами начальника смены"
+    echo "  addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
+    echo "  lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
+    echo "  unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
+    echo "  del, delete удалить ПОЛЬЗОВАТЕЛЯ"
+    echo "  list, show  вывести список пользователей"
+    echo "  help        показать эту справку"
+}
+
+# Вывести имя пользователя, при отсутствии вывести сообщение об ошибку и выйти
+username() {
+    if [ -z "$1" ]; then
+        echo "userctl: не задано имя учетной записи"
+        echo "Использование: userctl $command ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]"
+        exit 1
+    fi
+    echo $1
+}
+
+if [ $(basename $0) == "userctl" ]; then
+    # Если программа вызвана непосредственно,
+    # то требуемое действие задается в первом аргументе
+    command=$1
+    shift
+else
+    # Если программа вызвана через симлинк,
+    # то требуемое действие соответствует имени симлинка
+    command=$(basename $0)
+fi
+
+if [ $command == "--help" ] || [ $command == "help" ]; then
+    usage
+    exit
+fi
+
+# Остальные команды требуют прав суперпользователя
+if [ $(id -u) -ne 0 ]; then
+    echo "userctl: запустите программу с правами суперпользователя"
+    exit
+fi
+
+secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
+
+# Вывести список пользователей и выйти
+if [ $command == "list" ] || [ $command == "show" ]; then
+    echo "Локальные пользователи:"
+    getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {system("groups " $1); system("pdpl-user " $1); system("echo")}}'
+    # Если есть команда ald-admin, то вывести доменных пользователей
+    which ald-admin 1> /dev/null
+    if [ $? -eq 0 ]; then
+        echo "Доменные пользователи:"
+        ald-admin user-list | awk '{system ("groups "$1); system("pdpl-user " $1)}'
+    fi
+    exit 0
+fi
+
+# Проверить наличие обязательного для остальных команд имени пользователя и выйти, если не задано
+# if [ $# -eq 0 ]; then
+#   echo "userctl: не задано имя учетной записи"
+#   echo "Использование: userctl $command ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]"
+#   exit 1
+# fi
+
+case $command in
+addoperator)
+    primary_group="operators"
+    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    # Возвращает 9, если пользователь $1 уже существует
+    if [ $? -ne 0 ]; then
+      exit $?
+    fi
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    ;;
+addnachsmen)
+    primary_group="nachsmens"
+    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    if [ $? -ne 0 ]; then
+      exit $?
+    fi
+    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    ;;
+addadmsec)
+    primary_group="astra-admin"
+    useradd -g $primary_group -G $secondary_groups,astra-console,adm -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    if [ $? -ne 0 ]; then
+      exit $?
+    fi
+    pdpl-user -l 0:0 -i 63 -c 0:0 $1
+    # Генерация ssh-ключей для созданого администратора безопасности
+    mkdir -p /home/$1/.ssh
+    ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
+    chown -R $1:$primary_group /home/$1/.ssh
+    # Далее нужно скопировать открытый ключ на все управляемые СВТ
+    ;;
+del|delete)
+    deluser $1 --remove-home
+    ;;
+lock|block)
+    # Блокировка пароля учетной записи, оставляет возможность подключения по ssh
+    passwd -l $1 1>/dev/null
+    # Блокировка учетной записи
+    # usermod -L $1
+    ;;
+unlock|unblock)
+    # Разблокировка пароля учетной записи
+    passwd -u $1 1>/dev/null
+    # Разблокировка учетной записи
+    # usermod -U $1
+    ;;
+*)
+    echo "userctl: неизвестная команда $command"
+    usage
+    exit 2
+    ;;
+esac
