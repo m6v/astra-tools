@@ -125,7 +125,7 @@
       
   - name: Создание символических ссылок на скрипт добавления специальных пользователей
     ansible.builtin.file:
-      src: /usr/local/bin/adduser 
+      src: /usr/local/bin/userctl 
       dest: /usr/bin/{{ item }}
       state: link
     loop:

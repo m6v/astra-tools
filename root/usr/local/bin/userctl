@@ -9,24 +9,19 @@ usage() {
     echo "  addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
     echo "  lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
     echo "  unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
-    echo "  del, delete удалить ПОЛЬЗОВАТЕЛЯ"
-    echo "  list, show  вывести список пользователей"
+    echo "  delete      удалить ПОЛЬЗОВАТЕЛЯ"
+    echo "  list        вывести список пользователей"
     echo "  help        показать эту справку"
-}
-
-# Вывести имя пользователя, при отсутствии вывести сообщение об ошибку и выйти
-username() {
-    if [ -z "$1" ]; then
-        echo "userctl: не задано имя учетной записи"
-        echo "Использование: userctl $command ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]"
-        exit 1
-    fi
-    echo $1
 }
 
 if [ $(basename $0) == "userctl" ]; then
     # Если программа вызвана непосредственно,
-    # то требуемое действие задается в первом аргументе
+    # то требуемое действие должно задаваться в первом аргументе
+    if [ $# -eq 0 ]; then
+        echo "userctl: не задана команда"
+        usage
+        exit 1
+    fi
     command=$1
     shift
 else
@@ -37,7 +32,7 @@ fi
 
 if [ $command == "--help" ] || [ $command == "help" ]; then
     usage
-    exit
+    exit 0
 fi
 
 # Остальные команды требуют прав суперпользователя
@@ -49,24 +44,24 @@ fi
 secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
 
 # Вывести список пользователей и выйти
-if [ $command == "list" ] || [ $command == "show" ]; then
+if [ $command == "list" ]; then
     echo "Локальные пользователи:"
     getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {system("groups " $1); system("pdpl-user " $1); system("echo")}}'
     # Если есть команда ald-admin, то вывести доменных пользователей
-    which ald-admin 1> /dev/null
+    sudo which ald-admin 1> /dev/null
     if [ $? -eq 0 ]; then
         echo "Доменные пользователи:"
-        ald-admin user-list | awk '{system ("groups "$1); system("pdpl-user " $1)}'
+        sudo ald-admin user-list | awk '{system ("groups "$1); system("sudo pdpl-user " $1); system("echo")}'
     fi
     exit 0
 fi
 
 # Проверить наличие обязательного для остальных команд имени пользователя и выйти, если не задано
-# if [ $# -eq 0 ]; then
-#   echo "userctl: не задано имя учетной записи"
-#   echo "Использование: userctl $command ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]"
-#   exit 1
-# fi
+if [ $# -eq 0 ]; then
+    echo "userctl: не задан пользователь"
+    usage
+    exit 3
+fi
 
 case $command in
 addoperator)
@@ -100,7 +95,11 @@ addadmsec)
     # Далее нужно скопировать открытый ключ на все управляемые СВТ
     ;;
 del|delete)
-    deluser $1 --remove-home
+    read -e -p "Удалить учетную запись $1 [y/N]" yesno
+    if [ "$yesno" == "y" ] || [ "$yesno" == "Y" ]; then
+        deluser $1 --remove-home --quiet
+        # При необходимости здесь можно бэкапить /etc/passwd
+    fi
     ;;
 lock|block)
     # Блокировка пароля учетной записи, оставляет возможность подключения по ssh
