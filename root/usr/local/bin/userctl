@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 
+# Задать имя программы явно, а не через $0, т.к. может вызываться через симлинк)
+self=userctl
+
 usage() {
-    echo "Использование: userctl КОМАНДА [ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]]"
+    echo "Использование: $self КОМАНДА [ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]]"
     echo "Выполняет операции с учетными записями пользователей, требует прав суперпользователя"
     echo "КОМАНДЫ:"
     echo "  addadmsec   создать ПОЛЬЗОВАТЕЛЯ с правами администратора безопасности"
     echo "  addnachsmen создать ПОЛЬЗОВАТЕЛЯ с правами начальника смены"
     echo "  addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
+    echo "  chpass      сменить ПАРОЛЬ ПОЛЬЗОВАТЕЛЯ"
     echo "  lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
     echo "  unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
     echo "  delete      удалить ПОЛЬЗОВАТЕЛЯ"
@@ -14,11 +18,11 @@ usage() {
     echo "  help        показать эту справку"
 }
 
-if [ $(basename $0) == "userctl" ]; then
+if [ $(basename $0) == $self ]; then
     # Если программа вызвана непосредственно,
     # то требуемое действие должно задаваться в первом аргументе
     if [ $# -eq 0 ]; then
-        echo "userctl: не задана команда"
+        echo "$self: не задана команда"
         usage
         exit 1
     fi
@@ -37,16 +41,14 @@ fi
 
 # Остальные команды требуют прав суперпользователя
 if [ $(id -u) -ne 0 ]; then
-    echo "userctl: запустите программу с правами суперпользователя"
+    echo "$self: запустите программу с правами суперпользователя"
     exit
 fi
-
-secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
 
 # Вывести список пользователей и выйти
 if [ $command == "list" ]; then
     echo "Локальные пользователи:"
-    getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {system("groups " $1); system("pdpl-user " $1); system("echo")}}'
+    sudo getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {system("groups " $1); system("pdpl-user " $1); system("echo")}}'
     # Если есть команда ald-admin, то вывести доменных пользователей
     sudo which ald-admin 1> /dev/null
     if [ $? -eq 0 ]; then
@@ -58,10 +60,12 @@ fi
 
 # Проверить наличие обязательного для остальных команд имени пользователя и выйти, если не задано
 if [ $# -eq 0 ]; then
-    echo "userctl: не задан пользователь"
+    echo "$self: не задан пользователь"
     usage
     exit 3
 fi
+
+secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
 
 case $command in
 addoperator)
@@ -94,6 +98,14 @@ addadmsec)
     chown -R $1:$primary_group /home/$1/.ssh
     # Далее нужно скопировать открытый ключ на все управляемые СВТ
     ;;
+chpass|chpasswd)
+    if [ -z "$2" ]; then
+        echo "$self: не задан пароль пользователя"
+        usage
+        exit 4
+    fi
+    echo "$1:$2" | chpasswd &>/dev/null
+    ;;
 del|delete)
     read -e -p "Удалить учетную запись $1 [y/N]" yesno
     if [ "$yesno" == "y" ] || [ "$yesno" == "Y" ]; then
@@ -114,7 +126,7 @@ unlock|unblock)
     # usermod -U $1
     ;;
 *)
-    echo "userctl: неизвестная команда $command"
+    echo "$self: неизвестная команда $command"
     usage
     exit 2
     ;;
