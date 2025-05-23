@@ -1,15 +1,5 @@
 Добавить установку python-dbus и конфиг с разрешением приема широковещательных сообщений
 
-Переименовать adduser в userctrl и сделать следующие варианты использования
-userctrl showusers
-userctrl addadmin user_name password
-userctrl addoperator user_name password
-userctrl addnachsmen user_name password
-userctrl deluser user_name
-userctrl lockuser user_name
-userctrl unlockuser user_name
-если user_name не задано и программа запущена не из скрипта, запрашивать имя пользователя интерактивно
-
 Попробовать брать результаты КЦ не из /var/lib/afick/history, а из journald
 
 Сделать отключение ненужных служб
@@ -23,9 +13,10 @@ inventory = /etc/ansible/hosts
 become = True
 become_ask_pass = True
 
-Добавить файл /root/etc/ansible/hosts с перечнем конфигурируемых хостов
+Добавить файл /etc/ansible/hosts с перечнем конфигурируемых хостов
 
-NB! После выполнения указанных настроек для создания учеток на всех хостах можно использовать сокращенные варианты adhoc команд (см.: https://docs.ansible.com/ansible/latest/command_guide/intro_adhoc.html),
+NB! После выполнения указанных настроек для создания учеток на всех хостах можно использовать сокращенные варианты adhoc команд
+(см.: https://docs.ansible.com/ansible/latest/command_guide/intro_adhoc.html),
 например, 
 ansible -m shell -a "addoperator user_name password" all 
 вместо полной

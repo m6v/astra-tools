@@ -61,16 +61,19 @@ sudo pdpl-file -R -r -s 2:63:0 /
 sudo pdp-ls -Ma /
 
 Управление пользователями
-Показать
-showusers # Кастомный скрипт
+Показать список пользователей
+userctl list # Кастомный скрипт
 Создание пользователя
-addoperator user_name password
-addnachsmen user_name password
-addadmsec user_name password
+userctl addoperator user_name password
+userctl addnachsmen user_name password
+userctl addadmsec user_name password
 Блокирование/разблокирование
+userctl lock user_name
 passwd -l user_name # Можно сделать alias lockuser='passwd -l'
+userctl unlock user_name
 passwd -u user_name # Можно сделать alias unlockuser='passwd -u'
 Удаление
 deluser user_name --remove-home
 Смена пароля
-
+userctl chpass user_name password
+echo "user_name:password" | chpasswd

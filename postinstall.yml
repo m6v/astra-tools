@@ -142,8 +142,8 @@
   - name: Создание учетных записей оператора и начальника смены
     tags: addusers
     ansible.builtin.shell: |
-      addoperator operator {{ default_passwd }}
-      addnachsmen nachsmen {{ default_passwd }}
+      /usr/local/bin/userctl addoperator operator {{ default_passwd }}
+      /usr/local/bin/userctl addnachsmen nachsmen {{ default_passwd }}
   # args:
   #   warn: false
 
