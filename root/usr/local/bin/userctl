@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
 
-# Задать имя программы явно, а не через $0, т.к. может вызываться через симлинк)
-self=userctl
-
 usage() {
-    echo "Использование: $self КОМАНДА [ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]]"
-    echo "Выполняет операции с учетными записями пользователей, требует прав суперпользователя"
-    echo "КОМАНДЫ:"
-    echo "  addadmsec   создать ПОЛЬЗОВАТЕЛЯ с правами администратора безопасности"
-    echo "  addnachsmen создать ПОЛЬЗОВАТЕЛЯ с правами начальника смены"
-    echo "  addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
-    echo "  chpass      сменить ПАРОЛЬ ПОЛЬЗОВАТЕЛЯ"
-    echo "  lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
-    echo "  unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
-    echo "  delete      удалить ПОЛЬЗОВАТЕЛЯ"
-    echo "  list        вывести список пользователей"
-    echo "  help        показать эту справку"
+    cat << EOF
+Использование: userctl КОМАНДА [ПОЛЬЗОВАТЕЛЬ [ПАРОЛЬ]]
+Выполняет операции с учетными записями пользователей
+КОМАНДЫ:
+  addadmsec   создать ПОЛЬЗОВАТЕЛЯ с правами администратора безопасности"
+  addnachsmen создать ПОЛЬЗОВАТЕЛЯ с правами начальника смены"
+  addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
+  lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
+  unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
+  delete      удалить ПОЛЬЗОВАТЕЛЯ"
+  list        вывести список пользователей"
+  help        показать эту справку"
+EOF
 }
 
-if [ $(basename $0) == $self ]; then
+if [ $(basename $0) == "userctl" ]; then
     # Если программа вызвана непосредственно,
     # то требуемое действие должно задаваться в первом аргументе
     if [ $# -eq 0 ]; then
-        echo "$self: не задана команда"
+        echo "userctl: не задана команда"
         usage
         exit 1
     fi
@@ -39,94 +37,95 @@ if [ $command == "--help" ] || [ $command == "help" ]; then
     exit 0
 fi
 
-# Остальные команды требуют прав суперпользователя
-if [ $(id -u) -ne 0 ]; then
-    echo "$self: запустите программу с правами суперпользователя"
+# Остальные команды требуют прав суперпользователя,
+# поэтому запрашиваем пароль здесь, чтобы sudo больше не требовал пароля
+sudo true
+if [ $? -ne 0 ]; then
     exit
-fi
-
-# Вывести список пользователей и выйти
-if [ $command == "list" ]; then
-    echo "Локальные пользователи:"
-    sudo getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {system("groups " $1); system("pdpl-user " $1); system("echo")}}'
-    # Если есть команда ald-admin, то вывести доменных пользователей
-    sudo which ald-admin 1> /dev/null
-    if [ $? -eq 0 ]; then
-        echo "Доменные пользователи:"
-        sudo ald-admin user-list | awk '{system ("groups "$1); system("sudo pdpl-user " $1); system("echo")}'
-    fi
-    exit 0
-fi
-
-# Проверить наличие обязательного для остальных команд имени пользователя и выйти, если не задано
-if [ $# -eq 0 ]; then
-    echo "$self: не задан пользователь"
-    usage
-    exit 3
 fi
 
 secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
 
+# Вывести список несистемных пользователей и выйти
+if [ $command == "list" ]; then
+    echo "Локальные пользователи:"
+    # Диапазон uid используемый командой  useradd задается значениями
+    # UID_MIN и UID_MAX в файле /etc/login.defs (по дефолту от 1000 до 60000)
+    getent passwd | sort | awk -F: '{if ($3>=1000 && $3<60000) {
+                                         system("groups " $1);
+                                         system("sudo pdpl-user " $1);
+                                         system("echo")
+                                         }}'
+    # Если есть команда ald-admin, то вывести список доменных пользователей
+    sudo which ald-admin 1> /dev/null
+    if [ $? -eq 0 ]; then
+        echo "Доменные пользователи:"
+        sudo ald-admin user-list | sort | awk '{system ("groups "$1); \
+                                                system("sudo pdpl-user " $1); \
+                                                system("echo")}'
+    fi
+    exit 0
+fi
+
+# Проверить наличие обязательного для остальных команд имени пользователя
+if [ $# -eq 0 ]; then
+    echo "userctl: не задан пользователь"
+    usage
+    exit 3
+fi
+
 case $command in
 addoperator)
     primary_group="operators"
-    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    sudo useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
     # Возвращает 9, если пользователь $1 уже существует
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    sudo pdpl-user -l 0:2 -i 0 -c 0:0 $1
     ;;
 addnachsmen)
     primary_group="nachsmens"
-    useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    sudo useradd -g $primary_group -G $secondary_groups -s /bin/bash -p $(openssl passwd -1 $2) -m $1
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:2 -i 0 -c 0:0 $1
+    sudo pdpl-user -l 0:2 -i 0 -c 0:0 $1
     ;;
 addadmsec)
     primary_group="astra-admin"
-    useradd -g $primary_group -G $secondary_groups,astra-console,adm -s /bin/bash -p $(openssl passwd -1 $2) -m $1
+    sudo useradd -g $primary_group -G $secondary_groups,astra-console,adm -s /bin/bash -p $(openssl passwd -1 $2) -m $1
     if [ $? -ne 0 ]; then
       exit $?
     fi
-    pdpl-user -l 0:0 -i 63 -c 0:0 $1
+    sudo pdpl-user -l 0:0 -i 63 -c 0:0 $1
     # Генерация ssh-ключей для созданого администратора безопасности
-    mkdir -p /home/$1/.ssh
-    ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
-    chown -R $1:$primary_group /home/$1/.ssh
+    sudo mkdir -p /home/$1/.ssh
+    sudo ssh-keygen -f /home/$1/.ssh/id_rsa -q -N ""
+    sudo chown -R $1:$primary_group /home/$1/.ssh
     # Далее нужно скопировать открытый ключ на все управляемые СВТ
-    ;;
-chpass|chpasswd)
-    if [ -z "$2" ]; then
-        echo "$self: не задан пароль пользователя"
-        usage
-        exit 4
-    fi
-    echo "$1:$2" | chpasswd &>/dev/null
     ;;
 del|delete)
     read -e -p "Удалить учетную запись $1 [y/N]" yesno
     if [ "$yesno" == "y" ] || [ "$yesno" == "Y" ]; then
-        deluser $1 --remove-home --quiet
+        sudo deluser $1 --remove-home --quiet
         # При необходимости здесь можно бэкапить /etc/passwd
     fi
     ;;
 lock|block)
     # Блокировка пароля учетной записи, оставляет возможность подключения по ssh
-    passwd -l $1 1>/dev/null
+    sudo passwd -l $1 1>/dev/null
     # Блокировка учетной записи
     # usermod -L $1
     ;;
 unlock|unblock)
     # Разблокировка пароля учетной записи
-    passwd -u $1 1>/dev/null
+    sudo passwd -u $1 1>/dev/null
     # Разблокировка учетной записи
     # usermod -U $1
     ;;
 *)
-    echo "$self: неизвестная команда $command"
+    echo "userctl: неизвестная команда $command"
     usage
     exit 2
     ;;
