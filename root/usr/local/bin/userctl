@@ -8,6 +8,7 @@ usage() {
   addadmsec   создать ПОЛЬЗОВАТЕЛЯ с правами администратора безопасности"
   addnachsmen создать ПОЛЬЗОВАТЕЛЯ с правами начальника смены"
   addoperator создать ПОЛЬЗОВАТЕЛЯ с правами оператора"
+  status      вывести статус ПОЛЬЗОВАТЕЛЯ
   lock        заблокировать ПОЛЬЗОВАТЕЛЯ"
   unlock      разблокировать ПОЛЬЗОВАТЕЛЯ"
   delete      удалить ПОЛЬЗОВАТЕЛЯ"
@@ -44,7 +45,10 @@ if [ $? -ne 0 ]; then
     exit
 fi
 
-secondary_groups="video,users,plugdev,floppy,dialout,cdrom,audio"
+# Получить список групп в которые по умолчанию добавляются вновь создаваемые пользователи
+# NB! По умолчанию в список включены группы fuse и veston-launch, которых нет в системе!
+# Их необходимо удалить из параметра EXTRA_GROUPS в файле /etc/adduser.conf
+secondary_groups=$(grep ^EXTRA_GROUPS /etc/adduser.conf | cut -d'"' -f2 | tr ' ' ',')
 
 # Вывести список несистемных пользователей и выйти
 if [ $command == "list" ]; then
@@ -60,8 +64,8 @@ if [ $command == "list" ]; then
     sudo which ald-admin 1> /dev/null
     if [ $? -eq 0 ]; then
         echo "Доменные пользователи:"
-        sudo ald-admin user-list | sort | awk '{system ("groups "$1); \
-                                                system("sudo pdpl-user " $1); \
+        sudo ald-admin user-list | sort | awk '{system ("groups "$1);
+                                                system("sudo pdpl-user " $1);
                                                 system("echo")}'
     fi
     exit 0
@@ -105,11 +109,14 @@ addadmsec)
     sudo chown -R $1:$primary_group /home/$1/.ssh
     # Далее нужно скопировать открытый ключ на все управляемые СВТ
     ;;
+status)
+    passwd --status $1
+    ;;
 del|delete)
     read -e -p "Удалить учетную запись $1 [y/N]" yesno
     if [ "$yesno" == "y" ] || [ "$yesno" == "Y" ]; then
+        # При необходимости сначала можно бэкапить /etc/passwd
         sudo deluser $1 --remove-home --quiet
-        # При необходимости здесь можно бэкапить /etc/passwd
     fi
     ;;
 lock|block)
