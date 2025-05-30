@@ -1,8 +1,13 @@
+# Структура каталогов и файлов в целевой системе
+
 В каталоге root создается дерево каталогов с файлами которые при постинсталяционной настройке копируются в целевую систему
 
 root
 ├── etc
 │   ├── afick.conf
+│   ├── ansible
+│   │   ├── ansible.cfg
+│   │   └── hosts
 │   ├── audit
 │   │   └── rules.d
 │   │       └── astra-custom.rules
@@ -23,9 +28,8 @@ root
 └── usr
     ├── local
     │   ├── bin
-    │   │   ├── adduser
     │   │   ├── notify-sender
-    │   │   ├── showusers
+    │   │   ├── userctl
     │   │   └── xmpp-sender
     │   └── lib
     │       └── python2.7
@@ -35,9 +39,8 @@ root
         └── applications
             └── notify-sender.desktop
 
+
 afick.service юнит средства регламентного контроля целостности afick
-afick.conf конфигурационный файл syslog-ng для логирования результатов работы afick
-afick_parser парсер логов afick
 postinst.sh постинсталляционный скрипт
 notify-sender.desktop ярлык на который создаются симлинки для автозапуска программы notify-sender (если от этого варианта уведомлений отказываемся, то удалить)
 
