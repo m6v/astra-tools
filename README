@@ -49,8 +49,7 @@ notify-sender.desktop ярлык на который создаются симл
 иначе все события поступают с ключом parsec-p и их невозможно нормально фильтровать по назначенным кастомным ключам!
 
 Создание архива в инструментальной системе
-cd root
-tar -czvf ../postinst.tar.gz .
+cd root; tar --owner=root --group=root -czvf ../postinst.tar.gz *
 
 Разархивирование на целевой системе
 tar -xzvf postinst.tar.gz -C /
@@ -80,3 +79,21 @@ deluser user_name --remove-home
 Смена пароля
 userctl chpass user_name password
 echo "user_name:password" | chpasswd
+
+Настройки САВЗ Dr.Web (клиент) - все в карантин:
+drweb-ctl cfset LinuxGUI.OnKnownVirus Quarantine
+drweb-ctl cfset LinuxGUI.OnIncurable Quarantine
+drweb-ctl cfset LinuxGUI.OnSuspicious Quarantine
+drweb-ctl cfset LinuxGUI.OnAdware Quarantine
+drweb-ctl cfset LinuxGUI.OnDialers Quarantine
+drweb-ctl cfset LinuxGUI.OnJokes Quarantine
+drweb-ctl cfset LinuxGUI.OnRiskware Quarantine
+drweb-ctl cfset LinuxGUI.OnHacktools Quarantine
+drweb-ctl cfset LinuxSpider.OnKnownVirus Quarantine
+drweb-ctl cfset LinuxSpider.OnIncurable Quarantine
+drweb-ctl cfset LinuxSpider.OnSuspicious Quarantine
+drweb-ctl cfset LinuxSpider.OnAdware Quarantine
+drweb-ctl cfset LinuxSpider.OnDialers Quarantine
+drweb-ctl cfset LinuxSpider.OnJokes Quarantine
+drweb-ctl cfset LinuxSpider.OnRiskware Quarantine
+drweb-ctl cfset LinuxSpider.OnHacktools Quarantine
