@@ -16,6 +16,7 @@ usage() {
     echo "Примеры вызова:"
     echo "  $0 -mmin -10 foo.deb"
     echo "  $0 /usr/local foo.deb -mtime -1"
+    echo "  $0 /usr/local foo.deb -newermt 09:15:00"
     exit 1
 }
 
@@ -91,8 +92,8 @@ EXCLUDES=(
 )
 
 # Поиск и копирование измененных файлов во временный каталог с сохранением структуры путей
-find "$SRC_DIR" \( "${EXCLUDES[@]}" \) -prune -o -type f "${TIME_PARAMS[@]}" -print0 | \
-    tar --null -T - -cf - | tar -xf - -C "$BUILD_DIR"
+find "$SRC_DIR" \( "${EXCLUDES[@]}" \) -prune -o \( -type f -o -type l \) "${TIME_PARAMS[@]}" -print0 | tar --null -T - -cf - | tar -xf - -C "$BUILD_DIR"
+
 
 # Проверка наличия файлов
 if [ -z "$(ls -A "$BUILD_DIR")" ]; then
@@ -111,6 +112,8 @@ Description: Автоматический пакет обновлений изм
 EOF
 
 # Сборка DEB-пакета
+# Если нужно, чтобы внутри .deb пакета файлы принадлежали конкретному пользователю (например, root:root),
+# в блок сборки перед dpkg-deb добавить флаг --root-owner-group
 echo "Сборка пакета $DEB_FILE..."
 dpkg-deb --build "$BUILD_DIR" "$DEB_FILE"
 

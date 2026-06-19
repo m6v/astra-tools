@@ -14,7 +14,8 @@ usage() {
     echo ""
     echo "Примеры вызова:"
     echo "  $0 -mmin -10 backup.tar.gz"
-    echo "  $0 /var/www /tmp/web_site.tar.gz -mtime -1"
+    echo "  $0 /usr/local foo.tar.gz -mtime -1"
+    echo "  $0 /usr/local foo.tar.gz -newermt '09:15:00'"
     exit 1
 }
 
@@ -61,11 +62,6 @@ else
     ARCHIVE="${POSITIONAL_ARGS[1]}"
 fi
 
-if [ ${#TIME_PARAMS[@]} -eq 0 ]; then
-    echo "Ошибка: Не указан параметр времени"
-    usage
-fi
-
 SRC_DIR=$(realpath "$SRC_DIR")
 ARCHIVE=$(realpath "$ARCHIVE")
 SCRIPT_PATH=$(realpath "$0")
@@ -80,4 +76,6 @@ EXCLUDES=(
     -o -path "$SCRIPT_PATH"
 )
 
-find "$SRC_DIR" \( "${EXCLUDES[@]}" \) -prune -o -type f "${TIME_PARAMS[@]}" -print0 | tar -czvf "$ARCHIVE" --null -T -
+# Ссылки копируем как ссылки, а не заменяем файлами
+find "$SRC_DIR" \( "${EXCLUDES[@]}" \) -prune -o \( -type f -o -type l \) "${TIME_PARAMS[@]}" -print0 | tar -czvf "$ARCHIVE" --null -T -
+
