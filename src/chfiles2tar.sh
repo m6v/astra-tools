@@ -20,8 +20,8 @@ usage() {
 
 SRC_DIR=""
 ARCHIVE=""
-TIME_PARAMS=()        # Массив для хранения флагов с временными ограничениями
-POSITIONAL_ARGS=() # Массив для пути поиска и архива с измененными файлами
+TIME_PARAMS=()
+POSITIONAL_ARGS=()
 
 # Цикл разбора аргументов командной строки
 while [[ $# -gt 0 ]]; do
@@ -46,20 +46,24 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ ${#TIME_PARAMS[@]} -eq 0 ]; then
-    echo "Ошибка: Не указан параметр времени"
+if [ ${#TIME_PARAMS[@]} -eq 0 ] || [ ${#POSITIONAL_ARGS[@]} -eq 0 ]; then
+    echo "Ошибка: Не указаны обязательные параметры"
     usage
 fi
 
-if [ ${#POSITIONAL_ARGS[@]} -eq 0 ]; then
-    echo "Ошибка: Не указано имя архива"
-    usage
-elif [ ${#POSITIONAL_ARGS[@]} -eq 1 ]; then
-    ARCHIVE="${POSITIONAL_ARGS}"
+if [ ${#POSITIONAL_ARGS[@]} -eq 1 ]; then
+    # Если аргумент один - это имя архива, ищем измененные файлы в текущей папке
+    ARCHIVE="${POSITIONAL_ARGS[0]}"
     SRC_DIR="."
 else
-    SRC_DIR="${POSITIONAL_ARGS}"
-    ARCHIVE="${POSITIONAL_ARGS}"
+    # Если аргументов два - первый это путь (индекс 0), второй это архив (индекс 1)
+    SRC_DIR="${POSITIONAL_ARGS[0]}"
+    ARCHIVE="${POSITIONAL_ARGS[1]}"
+fi
+
+if [ ${#TIME_PARAMS[@]} -eq 0 ]; then
+    echo "Ошибка: Не указан параметр времени"
+    usage
 fi
 
 SRC_DIR=$(realpath "$SRC_DIR")
